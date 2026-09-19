@@ -1,3 +1,8 @@
+[![Latest Version](https://img.shields.io/github/v/release/goldnead/statamic-inline-edit?style=flat-square)](https://github.com/goldnead/statamic-inline-edit/releases)
+![Statamic 6](https://img.shields.io/badge/Statamic-6-FF269E)
+![PHP 8.2+](https://img.shields.io/badge/PHP-8.2+-777BB4)
+![workflow](https://github.com/goldnead/statamic-inline-edit/actions/workflows/tests.yml/badge.svg)
+
 <!-- statamic:hide -->
 # Statamic Inline Edit
 

@@ -25,9 +25,12 @@
     "entries are wrong.",
     "",
     "release.editions is an INFO, not a rule, and it asks a question rather than reporting a fault:",
-    "\"Confirm this is a single-edition commercial addon.\" Confirmed on 2026-09-19 — one product, no",
-    "Core/Pro split, sold inside the suite. The field stays absent because the linter is right that a",
-    "declared edition without a feature behind it cannot gate anything."
+    "\"Confirm this is a single-edition commercial addon.\" Confirmed on 2026-09-19 — one product,",
+    "no free/pro split, $49 on the Statamic Marketplace (MARKETPLACE.md has the reasoning). A free",
+    "tier was considered and rejected: the only natural cut is plain text free and everything else",
+    "paid, and plain text alone does not do the job anybody installs this for. The field stays",
+    "absent because the linter is right that a declared edition without a feature behind it cannot",
+    "gate anything."
   ],
   "disable": [
     "ui.statamic-cms-package",
