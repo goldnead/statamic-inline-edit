@@ -655,16 +655,76 @@ check(
     Math.abs(bubBox.y - selBox.y) < 90,
     'bubble at ' + Math.round(bubBox.y) + ', selection at ' + Math.round(selBox.y)
 );
+// The one thing a floating toolbar must not do is cover the text being
+// worked on. Where the page has a margin beside its measure, it goes there
+// and covers nothing at all; where it does not, above the selection, which
+// is what Bard and every editor of this shape does.
+async function bubbleOverField() {
+    const b = await bubble.boundingBox();
+    const f = await page.locator('.sie-rich').boundingBox();
+
+    return {
+        over: b.x < f.x + f.width && b.x + b.width > f.x && b.y < f.y + f.height && b.y + b.height > f.y,
+        b,
+        f,
+    };
+}
+
+// Wide enough that the page has a margin beside its measure. There the
+// toolbar belongs in the margin, where it covers nothing at all.
+await page.setViewportSize({ width: 1500, height: 800 });
+await page.waitForTimeout(250);
+await page.locator('.sie-rich h3').first().dblclick({ position: { x: 14, y: 12 } });
+await page.waitForTimeout(250);
+
+let seen = await bubbleOverField();
+check('with a margin beside the text, it covers nothing', !seen.over, JSON.stringify(seen.b) + ' over ' + JSON.stringify(seen.f));
 check(
-    'and below it, because there is a line above',
-    bubBox.y > selBox.y,
-    'placed above would cover the heading that was just written'
+    'and stays level with the line',
+    Math.abs(seen.b.y + seen.b.height / 2 - (seen.f.y + 30)) < 260,
+    'bubble at ' + Math.round(seen.b.y)
 );
-const tools = await page.locator('.sie-bubble-btn').allTextContents();
+
+// Narrow enough that there is no margin left. Then it has to go over the
+// text, and above is the least bad place: reading runs downwards.
+await page.setViewportSize({ width: 700, height: 800 });
+await page.waitForTimeout(250);
+await page.locator('.sie-rich h3').first().dblclick({ position: { x: 14, y: 12 } });
+await page.waitForTimeout(250);
+
+const narrowSel = await page.locator('.sie-rich h3').first().boundingBox();
+const narrowBub = await bubble.boundingBox();
+check(
+    'without one, above the selection and never on it',
+    narrowBub.y + narrowBub.height <= narrowSel.y + 2,
+    'bubble ends at ' + Math.round(narrowBub.y + narrowBub.height) + ', selection starts at ' + Math.round(narrowSel.y)
+);
+
+await page.setViewportSize({ width: 1100, height: 800 });
+await page.waitForTimeout(200);
+// Icons now, in Bard's style, so the names live where a pointer and a
+// screen reader can reach them rather than in the button's text.
+const tools = await page.locator('.sie-bubble-btn').evaluateAll((els) => els.map((e) => e.getAttribute('aria-label')));
 check('with the usual suspects', JSON.stringify(tools) === '["Bold","Italic","H2","H3","List","Quote","Link"]', JSON.stringify(tools));
+check(
+    'every one of them named for a screen reader',
+    await page.locator('.sie-bubble-btn').evaluateAll((els) => els.every((e) => e.getAttribute('aria-label') && e.title)),
+);
+// A button with the right size and the right colour and no shape in it.
+// `all: unset` resets `d`, which is a real CSS property on an SVG path, and
+// every computed style still reads correctly while the icon is invisible.
+check(
+    'and the icons actually have a shape',
+    await page.locator('.sie-bubble-btn svg path').first().evaluate((el) => getComputedStyle(el).d !== 'none'),
+    'all: unset reaches the path data unless svg is excluded from it'
+);
+check(
+    'and it is light, not another dark panel',
+    (await page.locator('.sie-bubble').evaluate((el) => getComputedStyle(el).backgroundColor)) === 'rgb(255, 255, 255)'
+);
 check('and it says what the selection already is', (await page.locator('.sie-bubble-on').count()) >= 1);
 
-await page.locator('.sie-bubble-btn', { hasText: 'Bold' }).click();
+await page.locator('.sie-bubble-btn[aria-label="Bold"]').click();
 await page.waitForTimeout(150);
 check('pressing one changes the text', (await page.locator('.sie-rich h3 strong').count()) === 1);
 

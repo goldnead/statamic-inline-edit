@@ -26,6 +26,25 @@ import Link from '@tiptap/extension-link';
 import { Markdown } from 'tiptap-markdown';
 
 /**
+ * Seven glyphs, drawn here rather than taken from anywhere.
+ *
+ * Statamic ships its own icons for exactly these, but they belong to a
+ * commercial package and copying them into an addon is a licensing question
+ * nobody needs. These are the generic shapes every editor uses, as plain
+ * stroked paths, sized to the surrounding text.
+ *
+ * Bold, italic and the headings are letterforms rather than drawings, which
+ * is what Statamic's own icons for them are too: a B with its counters is a
+ * letter, and drawn as a filled path at 17px it is a blob. "H2" also says
+ * which level it is, where no picture of a heading does.
+ */
+const ICONS = {
+    list: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6.5h11M9 12h11M9 17.5h11M4.5 6.5h.01M4.5 12h.01M4.5 17.5h.01"/></svg>',
+    quote: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9.5 6.5H5.5a1 1 0 0 0-1 1v4a1 1 0 0 0 1 1h3v1.5a3 3 0 0 1-3 3M19.5 6.5h-4a1 1 0 0 0-1 1v4a1 1 0 0 0 1 1h3v1.5a3 3 0 0 1-3 3"/></svg>',
+    link: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 13.5a4 4 0 0 0 6 .5l2.5-2.5a4 4 0 0 0-5.5-5.5L11.5 7.5M14 10.5a4 4 0 0 0-6-.5L5.5 12.5a4 4 0 0 0 5.5 5.5l1.5-1.5"/></svg>',
+};
+
+/**
  * The toolbar that appears over a selection.
  *
  * Rolled by hand rather than pulled from `@tiptap/extension-bubble-menu`:
@@ -38,20 +57,30 @@ function makeBubble(editor, labels) {
     bar.hidden = true;
 
     const buttons = [
-        { key: 'bold', label: labels.bold || 'Fett', is: 'bold', run: (c) => c.toggleBold() },
-        { key: 'italic', label: labels.italic || 'Kursiv', is: 'italic', run: (c) => c.toggleItalic() },
-        { key: 'h2', label: 'H2', is: ['heading', { level: 2 }], run: (c) => c.toggleHeading({ level: 2 }) },
-        { key: 'h3', label: 'H3', is: ['heading', { level: 3 }], run: (c) => c.toggleHeading({ level: 3 }) },
-        { key: 'list', label: labels.list || 'Liste', is: 'bulletList', run: (c) => c.toggleBulletList() },
-        { key: 'quote', label: labels.quote || 'Zitat', is: 'blockquote', run: (c) => c.toggleBlockquote() },
-        { key: 'link', label: labels.link || 'Link', is: 'link', run: null },
+        { key: 'bold', label: labels.bold || 'Fett', text: 'B', is: 'bold', run: (c) => c.toggleBold() },
+        { key: 'italic', label: labels.italic || 'Kursiv', text: 'I', is: 'italic', run: (c) => c.toggleItalic() },
+        { key: 'h2', label: 'H2', text: 'H2', is: ['heading', { level: 2 }], run: (c) => c.toggleHeading({ level: 2 }) },
+        { key: 'h3', label: 'H3', text: 'H3', is: ['heading', { level: 3 }], run: (c) => c.toggleHeading({ level: 3 }) },
+        { key: 'list', label: labels.list || 'Liste', icon: ICONS.list, is: 'bulletList', run: (c) => c.toggleBulletList() },
+        { key: 'quote', label: labels.quote || 'Zitat', icon: ICONS.quote, is: 'blockquote', run: (c) => c.toggleBlockquote() },
+        { key: 'link', label: labels.link || 'Link', icon: ICONS.link, is: 'link', run: null },
     ];
 
     const nodes = buttons.map((spec) => {
         const btn = document.createElement('button');
         btn.type = 'button';
-        btn.className = 'sie-bubble-btn';
-        btn.textContent = spec.label;
+        btn.className = 'sie-bubble-btn' + (spec.text ? ' sie-bubble-text sie-bubble-' + spec.key : '');
+
+        // An icon needs its name somewhere a person or a screen reader can
+        // reach. `title` for the pointer, `aria-label` for everything else.
+        if (spec.text) {
+            btn.textContent = spec.text;
+        } else {
+            btn.innerHTML = spec.icon;
+        }
+
+        btn.title = spec.label;
+        btn.setAttribute('aria-label', spec.label);
 
         // mousedown, not click: a click would take the selection away first,
         // and every one of these commands acts on the selection.
@@ -93,23 +122,51 @@ function makeBubble(editor, labels) {
         bar.style.top = '0px';
 
         const own = bar.getBoundingClientRect();
+        const field = editor.view.dom.getBoundingClientRect();
         const centre = (Math.min(start.left, end.left) + Math.max(start.right, end.right)) / 2;
-        const left = Math.min(Math.max(8, centre - own.width / 2), window.innerWidth - own.width - 8);
+        const middle = (Math.min(start.top, end.top) + Math.max(start.bottom, end.bottom)) / 2;
+
+        // First choice: the margin beside the text, where it covers nothing
+        // at all.
+        //
+        // A floating toolbar over a line of text always hides something. On
+        // a page with a reading measure there is usually empty space to one
+        // side of it, and a toolbar this small fits in it. Tried on the left
+        // first because that is where the eye already is in a left-to-right
+        // text, then the right.
+        const gutterLeft = field.left - own.width - 14;
+        const gutterRight = field.right + 14;
+        const beside = Math.round(Math.min(Math.max(8, middle - own.height / 2), window.innerHeight - own.height - 8));
+
+        if (gutterLeft > 8) {
+            bar.style.left = Math.round(gutterLeft) + 'px';
+            bar.style.top = beside + 'px';
+            bar.style.visibility = '';
+            paint();
+
+            return;
+        }
+
+        if (gutterRight + own.width < window.innerWidth - 8) {
+            bar.style.left = Math.round(gutterRight) + 'px';
+            bar.style.top = beside + 'px';
+            bar.style.visibility = '';
+            paint();
+
+            return;
+        }
+
+        // No margin, so it has to go over the text: above the selection,
+        // which is what Bard, Notion and every other editor of this shape
+        // does. Reading runs downwards, so covering the line above costs
+        // less than covering the rest of the sentence being worked on. What
+        // it must never cover is the selection itself, hence the 8px.
         const above = Math.min(start.top, end.top) - own.height - 8;
         const below = Math.max(start.bottom, end.bottom) + 8;
-
-        // Above the selection, unless there is text of this field's own
-        // directly above it. Placing the toolbar over the heading somebody
-        // just wrote, to edit the sentence under it, hides the very thing
-        // they are working against. Checked against the field's own top edge
-        // rather than the viewport, which is what the old `above > 8` test
-        // measured and why it never caught this.
-        const fieldTop = editor.view.dom.getBoundingClientRect().top;
-        const roomAbove = above > 8 && Math.min(start.top, end.top) - fieldTop < 4;
-        const roomBelow = below + own.height < window.innerHeight - 8;
+        const left = Math.min(Math.max(8, centre - own.width / 2), window.innerWidth - own.width - 8);
 
         bar.style.left = Math.round(left) + 'px';
-        bar.style.top = Math.round(roomAbove || !roomBelow ? Math.max(8, above) : below) + 'px';
+        bar.style.top = Math.round(above > 8 ? above : below) + 'px';
         bar.style.visibility = '';
 
         paint();

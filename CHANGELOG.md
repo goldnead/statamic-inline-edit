@@ -36,7 +36,24 @@ every space typed into the rich editor, because Tiptap mounts its contenteditabl
 of the marker. Typing `## ` produced `##`, so the markdown shortcut that is the whole point
 never fired.
 
-35 PHP tests, 108 browser checks.
+### The toolbar, after Adrian saw it
+
+Light with icons, the way Bard's is, because this is a text-formatting toolbar in a Statamic
+site and it should look like the one the same person meets in the control panel. Bold, italic
+and the heading levels are letterforms, which is what Statamic's own icons for them are too;
+the rest are drawn here rather than copied out of a commercial package.
+
+And it goes in the margin beside the text where the page has one, covering nothing at all.
+Over the text only when there is no room, and then above the selection, because reading runs
+downwards. Two rounds of review had it covering first the heading above it and then the line
+below it; a smaller toolbar and the margin solve what moving it up and down could not.
+
+One bug worth naming: the icons were invisible while every computed style read correctly.
+`all: unset`, which is what keeps a host site's CSS out of this addon's chrome, also resets
+`d`, and `d` is a real CSS property on an SVG path. Right size, right colour, no shape. It
+took a screenshot of the toolbar on its own to see, and there is a check for it now.
+
+35 PHP tests, 113 browser checks.
 
 ## 1.1.0
 

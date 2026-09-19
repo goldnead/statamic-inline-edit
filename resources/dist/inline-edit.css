@@ -45,11 +45,16 @@
     pointer-events: none;
 }
 
+/* `:not(svg, svg *)` is not tidiness, it is the difference between an icon
+   and an empty button. `d` is a real CSS property on an SVG path, so
+   `all: unset` sets it to `none` and the path draws nothing: right size,
+   right colour, no shape. The computed styles all looked correct, which is
+   why this took a screenshot of the toolbar on its own to see. */
 .sie-bar,
 .sie-bar *,
 .sie-launch,
 .sie-bubble,
-.sie-bubble * {
+.sie-bubble *:not(svg, svg *) {
     all: unset;
     box-sizing: border-box;
     font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
@@ -688,17 +693,29 @@
     opacity: 0.45;
 }
 
-/* The toolbar that appears over a selection. Fixed, so nothing the host site
-   sets on an ancestor can clip it. */
+/* The toolbar that appears over a selection.
+ *
+ * Light, with icons, the way Bard's is: this is a text-formatting toolbar in
+ * a Statamic site, and it should look like the one the same person meets in
+ * the control panel. The rest of this addon's chrome is dark because it is
+ * chrome, a bar and an overlay that belong to the tool. This one belongs to
+ * the text.
+ *
+ * Fixed, so nothing the host site sets on an ancestor can clip it.
+ */
 .sie-bubble {
     position: fixed;
     z-index: 2147483003;
     display: flex;
-    gap: 2px;
+    align-items: center;
+    gap: 1px;
     padding: 4px;
     border-radius: 8px;
-    background: #16181d;
-    box-shadow: 0 8px 26px rgb(0 0 0 / 38%), 0 0 0 1px rgb(255 255 255 / 10%) inset;
+    background: #fff;
+    box-shadow:
+        0 0 0 1px rgb(17 24 39 / 8%),
+        0 6px 18px rgb(17 24 39 / 14%),
+        0 1px 2px rgb(17 24 39 / 8%);
 }
 
 .sie-bubble[hidden] { display: none; }
@@ -706,26 +723,58 @@
 .sie-bubble .sie-bubble-btn {
     display: inline-flex;
     align-items: center;
-    padding: 0 9px;
-    min-height: 30px;
+    justify-content: center;
+    width: 30px;
+    height: 30px;
     border-radius: 5px;
-    color: #f4f5f7;
-    font-size: 12px;
-    font-weight: 500;
-    white-space: nowrap;
+    color: #3f4451;
     cursor: pointer;
 }
 
-.sie-bubble .sie-bubble-btn:hover { background: rgb(255 255 255 / 14%); }
-
-.sie-bubble .sie-bubble-on {
-    background: #3b82f6;
-    color: #fff;
+.sie-bubble .sie-bubble-text {
+    width: auto;
+    min-width: 30px;
+    padding: 0 7px;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
 }
 
+.sie-bubble .sie-bubble-btn svg {
+    width: 17px;
+    height: 17px;
+    display: block;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.6;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+/* The two that are letters, set as letters. */
+.sie-bubble .sie-bubble-bold {
+    font-weight: 800;
+    font-size: 14px;
+}
+
+.sie-bubble .sie-bubble-italic {
+    font-style: italic;
+    font-family: Georgia, "Times New Roman", serif;
+    font-size: 15px;
+}
+
+.sie-bubble .sie-bubble-btn:hover { background: #f1f3f6; }
+
+.sie-bubble .sie-bubble-on {
+    background: #e8f0fe;
+    color: #2f6fe4;
+}
+
+.sie-bubble .sie-bubble-on:hover { background: #dce8fd; }
+
 .sie-bubble .sie-bubble-btn:focus-visible {
-    outline: 2px solid #60a5fa;
-    outline-offset: 1px;
+    outline: 2px solid #3b82f6;
+    outline-offset: -1px;
 }
 
 /* -------------------------------------------- the control panel overlay */

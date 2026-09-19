@@ -284,7 +284,7 @@ vendor/bin/phpstan analyse
 
 npm install
 npm run build               # resources/js/rich.js -> resources/dist/inline-edit-rich.js
-node tests/browser/run.mjs  # 108 checks: everything that only exists in a browser
+node tests/browser/run.mjs  # 113 checks: everything that only exists in a browser
 ```
 
 `resources/dist/inline-edit-rich.js` is committed, because a site that installs this addon gets
