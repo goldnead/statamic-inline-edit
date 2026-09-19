@@ -1,6 +1,10 @@
+<!-- statamic:hide -->
 # Statamic Inline Edit
 
-Edit content straight on the live page. Double-click, change it, save.
+> Edit content straight on the live page. Double-click, change it, save.
+<!-- /statamic:hide -->
+
+![Inline editing on the live page](screenshots/02-inline-editor.png)
 
 Not a page builder. You cannot move a block, add a section or change a layout with it, and that
 is on purpose. It exists for the change a client actually asks for: one wrong word in a
@@ -38,6 +42,17 @@ over the page for everything else. Close the bar and the page is a page again.
 
 Everyone else sees exactly what they saw before: same HTML, no wrapper elements, no script, no
 attributes. There is nothing to leak because for a visitor nothing is rendered.
+
+| | |
+|---|---|
+| ![Edit mode on, every marked field outlined](screenshots/01-editing-on.png) | ![A select opening next to the word the template made from it](screenshots/03-control.png) |
+| **Edit mode on.** Only marked fields get an outline. | **A control.** The value is not on the page, so a real one appears. |
+| ![The control panel in an overlay, scrolled to one field](screenshots/04-control-panel.png) | ![The same editor at phone width](screenshots/05-phone.png) |
+| **The control panel, in an overlay.** For Bard, Replicator and assets. | **On a phone.** One tap opens, because a double-click is a mouse gesture. |
+
+All five images are from the public demo, [demo.adriangoldner.dev/inline-edit](https://demo.adriangoldner.dev/inline-edit).
+There is no dark-mode pair: every surface this addon has is somebody else's page, in their
+colours.
 
 ## Install
 
@@ -300,6 +315,24 @@ page.
 
 `node tests/browser/run.mjs --shot out.png` writes a screenshot of the editor mid-edit.
 
-`resources/dist/` is hand-written vanilla JavaScript and CSS with no build step. The whole
-editor is a bar, a contenteditable and a `fetch`; a toolchain would buy nothing and would ship
-a bundle to every client page an editor opens. Keep it that way.
+`inline-edit.js` and `inline-edit.css` are hand-written vanilla with no build step, and should
+stay that way: the launcher, the bar and the save are a contenteditable and a `fetch`, a
+toolchain would buy nothing there, and those two files load on every page an editor opens.
+`inline-edit-rich.js` is the one exception and the reason there is a build at all. A WYSIWYG
+that understands markdown shortcuts is not something to hand-roll, it is loaded only when
+somebody actually opens such a field, and Statamic's own Bard is Tiptap too.
+
+---
+
+## Support
+
+Only the latest version is supported. Bugs and questions go to
+[GitHub issues](https://github.com/goldnead/statamic-inline-edit/issues).
+
+## Licence
+
+Proprietary. See [LICENSE.md](LICENSE.md).
+
+## Changelog · License
+
+[CHANGELOG.md](CHANGELOG.md) · [LICENSE.md](LICENSE.md)

@@ -19,3 +19,12 @@
 # would otherwise make every installing site download playwright.
 /package.json       export-ignore
 /package-lock.json  export-ignore
+
+# Pictures: 1.7 MB that no installed site ever displays. The README renders
+# on GitHub, on Packagist and in the marketplace listing, all three of which
+# read the repository, not the composer tarball; the cover and the icon are
+# pulled out of the repository too, by the docs site's own render script. The
+# family is split on this, 16 repos ignore /art and 11 ship it. Ignoring it is
+# the side with the argument.
+/art                export-ignore
+/screenshots        export-ignore
