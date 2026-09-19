@@ -96,6 +96,20 @@ class EditableTagTest extends TestCase
     }
 
     #[Test]
+    public function the_marker_carries_the_blueprint_label_for_the_empty_placeholder(): void
+    {
+        $this->makeCollection();
+        $entry = $this->makeEntry(['title' => 'Hello']);
+
+        $this->actingAs($this->anEditor());
+
+        $this->assertStringContainsString(
+            'data-sie-label="Überschrift"',
+            $this->render('{{ editable:title }}', $entry->toAugmentedArray())
+        );
+    }
+
+    #[Test]
     public function the_field_can_be_named_by_parameter(): void
     {
         $this->makeCollection();

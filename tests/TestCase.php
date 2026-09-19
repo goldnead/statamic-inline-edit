@@ -44,7 +44,10 @@ abstract class TestCase extends AddonTestCase
     protected function makeCollection(string $handle = 'pages'): void
     {
         $blueprint = Blueprint::makeFromFields([
-            'title' => ['type' => 'text'],
+            // An explicit display name, different from anything Statamic would
+            // derive from the handle, so a test asserting on it proves the
+            // blueprint was read rather than the handle prettified.
+            'title' => ['type' => 'text', 'display' => 'Überschrift'],
             'intro' => ['type' => 'textarea'],
             'promoted' => ['type' => 'toggle'],
             'hero' => ['type' => 'assets', 'max_files' => 1],

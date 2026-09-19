@@ -26,9 +26,13 @@
     h1 { font-size: 2.6rem; line-height: 1.15; margin: 0 0 1rem; }
     .meta { color: #6b6b73; font-size: 0.9rem; }
 
-    /* The host site is hostile to a floating bar on purpose: a global button
-       rule is completely normal out there, and the bar has to survive it. */
-    button { width: 100%; background: hotpink; font-size: 2rem; border: 4px solid lime; }
+    /* The host site is hostile on purpose: a global button rule is completely
+       normal out there, and the bar has to survive it. */
+    button { background: hotpink; font-size: 2rem; border: 4px solid lime; }
+
+    /* And the placeholder has to survive landing inside typography like this,
+       rather than inheriting it and reading as content. */
+    .kicker-ish { font-size: 1.6rem; text-transform: uppercase; letter-spacing: .3em; font-style: italic; }
 </style>
 </head>
 <body>
@@ -44,7 +48,7 @@ Stimmtechnisch bleibt meistens vieles offen.</span></p>
 
 <p>A second entry on the same page: <span data-sie-id="entry-2" data-sie-field="title" data-sie-type="text" data-sie-stamp="1700000001">Ein zweiter Eintrag</span></p>
 
-<p>An empty field, which has no box to click until the editor gives it one: <span data-sie-id="entry-1" data-sie-field="subtitle" data-sie-type="text" data-sie-stamp="1700000000"></span></p>
+<p class="kicker-ish">An empty field, which has no box to click until the editor gives it one: <span data-sie-id="entry-1" data-sie-field="subtitle" data-sie-type="text" data-sie-label="Dachzeile" data-sie-stamp="1700000000"></span></p>
 
 <script id="statamic-inline-edit-config" type="application/json">
 {
@@ -59,8 +63,9 @@ Stimmtechnisch bleibt meistens vieles offen.</span></p>
     "saved": "Saved",
     "discard": "Discard",
     "unsaved": ":count unsaved",
-    "hint": "Double-click any highlighted text.",
+    "hint": "Tap or double-click any highlighted text.",
     "empty": "Empty",
+    "empty_field": "Add :field",
     "conflict": "Someone else changed this page. Reload before saving.",
     "failed": "Could not save.",
     "leave": "You have unsaved changes on this page."

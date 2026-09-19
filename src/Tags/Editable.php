@@ -118,6 +118,13 @@ class Editable extends Tags
             'data-sie-stamp' => $this->stamp($entry),
         ];
 
+        // The field's own label from the blueprint, for the placeholder an
+        // empty field shows. "Add subtitle" tells the person which of three
+        // empty boxes on the page they are looking at; "Empty" does not.
+        if ($label = $this->label($value)) {
+            $attributes['data-sie-label'] = $label;
+        }
+
         if ($editor->isMultiline($type)) {
             $attributes['data-sie-multiline'] = 'true';
         }
@@ -145,6 +152,25 @@ class Editable extends Tags
         $modified = $entry->lastModified();
 
         return $modified ? (string) $modified->getTimestamp() : '';
+    }
+
+    /**
+     * The blueprint's display name for the field, if it has one.
+     *
+     * Never fatal: a field can be built without one, and a missing label costs
+     * a nicer placeholder, nothing else.
+     */
+    protected function label(Value $value): ?string
+    {
+        $field = $value->field();
+
+        if (! $field || ! method_exists($field, 'display')) {
+            return null;
+        }
+
+        $display = $field->display();
+
+        return is_string($display) && $display !== '' ? $display : null;
     }
 
     protected function fieldtype(Value $value): ?string

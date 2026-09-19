@@ -74,18 +74,41 @@ console.log('\nthe bar');
 
 check('appears', await bar.isVisible());
 check('starts with editing off', (await toggle.textContent()) === 'Edit page');
-check('has nothing to save yet', await save.isDisabled());
+check(
+    'shows only the toggle while editing is off',
+    !(await save.isVisible()) && !(await discard.isVisible()),
+    'dead buttons on a live page read as something broken'
+);
 
 const barBox = await bar.boundingBox();
+const viewport = page.viewportSize();
+
 check(
-    'is not stretched by the host stylesheet',
-    barBox.width < 600,
-    'width ' + Math.round(barBox.width) + 'px, the page sets button { width: 100% }'
+    'is docked across the full width',
+    Math.abs(barBox.width - viewport.width) < 2 && Math.abs(barBox.y + barBox.height - viewport.height) < 2,
+    'box ' + JSON.stringify(barBox)
 );
 check(
     'keeps its own colours',
     (await toggle.evaluate((el) => getComputedStyle(el).backgroundColor)) !== 'rgb(255, 105, 180)',
     'hotpink leaked in from the host stylesheet'
+);
+check(
+    'its buttons keep their own size',
+    (await toggle.boundingBox()).width < 240,
+    'the page sets a hostile global button rule'
+);
+check(
+    'its buttons are big enough for a thumb',
+    (await toggle.boundingBox()).height >= 44,
+    Math.round((await toggle.boundingBox()).height) + 'px'
+);
+
+// The bar is fixed, so without a spacer it lies on top of whatever the page
+// put at the bottom. The last paragraph must still be reachable.
+check(
+    'it reserves its own space at the end of the document',
+    Math.abs((await page.locator('.sie-spacer').boundingBox()).height - barBox.height) < 2
 );
 
 console.log('\nediting off');
@@ -96,20 +119,79 @@ check(
 );
 check('nothing is contenteditable', (await page.locator('[contenteditable]').count()) === 0);
 
+check(
+    'it publishes its height for other bottom-pinned overlays',
+    (await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--sie-bar-height').trim())) ===
+        Math.round(barBox.height) + 'px'
+);
+
 console.log('\nediting on');
+
+const toggleWidthBefore = (await toggle.boundingBox()).width;
 
 await toggle.click();
 
-check('the button says so', (await toggle.textContent()) === 'Editing');
+// Measured now rather than before the click: with editing off the button is
+// not on the page at all.
+let savePosition = Math.round((await save.boundingBox()).x);
+
+// One label in both states: it must not read like an invitation while it is
+// already running, and the button must not change width under the pointer
+// that is about to click it again.
+const toggleWidthOff = Math.round(toggleWidthBefore);
+check('the label does not change', (await toggle.textContent()) === 'Edit page');
+check('nor does it say it is pressed only in colour', (await toggle.getAttribute('aria-pressed')) === 'true');
+check(
+    'and the button has not changed width',
+    Math.abs(Math.round((await toggle.boundingBox()).width) - toggleWidthOff) < 2,
+    'was ' + toggleWidthOff + ', now ' + Math.round((await toggle.boundingBox()).width)
+);
+
+// The on state has to be readable at a glance and instantly, not after a
+// fade. Green is deliberately not used here: in Statamic green means "that
+// worked", and it is kept for the saved message.
+const toggleBg = await toggle.evaluate((el) => getComputedStyle(el).backgroundColor);
+// Read with the pointer still on the button, because that is where it is
+// the moment after someone clicks it.
+check(
+    'the on state is unmistakable, hover or not',
+    toggleBg === 'rgb(59, 130, 246)' || toggleBg === 'rgb(43, 111, 224)',
+    'got ' + toggleBg
+);
+check(
+    'and it does not fade into it',
+    (await toggle.evaluate((el) => getComputedStyle(el).transitionProperty)) === 'none',
+    'a fade means there is a moment where the bar says neither on nor off'
+);
+const saveBg = await save.evaluate((el) => getComputedStyle(el).backgroundColor);
+check('the primary action is not green', !saveBg.startsWith('rgb(62, 207'), 'got ' + saveBg);
 check(
     'editable fields are outlined',
     (await title.evaluate((el) => getComputedStyle(el).outlineStyle)) === 'dashed'
 );
 check(
-    'the empty field says it is empty',
-    (await empty.evaluate((el) => getComputedStyle(el, '::before').content)).includes('Empty')
+    'the empty field names itself',
+    (await empty.evaluate((el) => getComputedStyle(el, '::before').content)).includes('Add Dachzeile'),
+    'should use the blueprint label, not a bare "Empty"'
 );
-check('the hint is shown', (await count.textContent()).includes('Double-click'));
+check(
+    'and the placeholder does not inherit the page typography',
+    (await empty.evaluate((el) => getComputedStyle(el, '::before').textTransform)) === 'none' &&
+        (await empty.evaluate((el) => getComputedStyle(el, '::before').fontStyle)) === 'normal',
+    'the host paragraph is uppercase italic with wide tracking'
+);
+check('the hint is shown', (await count.textContent()).includes('double-click'));
+
+// Narrow screens drop the hint rather than clip it to "Tap o…". Checked here,
+// with nothing pending, because that is the only state in which it is on
+// screen at all.
+await page.setViewportSize({ width: 390, height: 844 });
+check(
+    'and dropped rather than clipped on a phone',
+    (await count.evaluate((el) => getComputedStyle(el).visibility)) === 'hidden'
+);
+await page.setViewportSize({ width: 1100, height: 800 });
+check('but back on a wide screen', (await count.evaluate((el) => getComputedStyle(el).visibility)) === 'visible');
 
 await title.dblclick();
 
@@ -121,6 +203,63 @@ await page.locator('body').click();
 
 check('the change is counted', (await count.textContent()) === '1 unsaved');
 check('saving is now possible', await save.isEnabled());
+
+// The bar grows as it gains a count and a status. If it were centred and
+// shrink-wrapped, the buttons would slide sideways between one click and the
+// next, and a second Save would land on empty space.
+const saveAtRest = savePosition;
+savePosition = Math.round((await save.boundingBox()).x);
+check(
+    'the Save button has not moved',
+    Math.abs(savePosition - saveAtRest) < 2,
+    'was ' + saveAtRest + ', now ' + savePosition
+);
+
+console.log('\ntouch');
+
+// A phone has no double-click. Without a single-tap path the bar appears and
+// nothing on the page can be opened.
+await page.locator('body').click();
+await second.dispatchEvent('pointerup', { pointerType: 'touch', bubbles: true });
+check('a single tap opens a field', await second.evaluate((el) => el.isContentEditable));
+await page.keyboard.press('Escape');
+
+console.log('\non a phone');
+
+await page.setViewportSize({ width: 390, height: 844 });
+
+check(
+    'the buttons still fit side by side',
+    (await save.boundingBox()).x + (await save.boundingBox()).width <= 390,
+    'Save runs off the edge'
+);
+check(
+    'and the toggle is still reachable',
+    (await toggle.boundingBox()).x >= 0 && (await toggle.boundingBox()).height >= 44
+);
+
+// The middle is a few dozen pixels wide here. The long form would be clipped
+// to "1 uns…", so the count drops to the number and stays readable.
+await page
+    .waitForFunction(() => document.querySelector('.sie-count').textContent === '1', { timeout: 3000 })
+    .catch(() => {});
+check(
+    'the count fits instead of being clipped',
+    (await count.textContent()) === '1',
+    'got "' + (await count.textContent()) + '"'
+);
+check(
+    'and it is not overflowing its box',
+    await count.evaluate((el) => el.scrollWidth <= el.clientWidth + 1),
+    'scroll ' + (await count.evaluate((el) => el.scrollWidth)) + ' vs client ' + (await count.evaluate((el) => el.clientWidth))
+);
+
+await page.setViewportSize({ width: 1100, height: 800 });
+await page
+    .waitForFunction(() => document.querySelector('.sie-count').textContent === '1 unsaved', { timeout: 3000 })
+    .catch(() => {});
+
+check('and the long form is back on a wide screen', (await count.textContent()) === '1 unsaved');
 
 console.log('\nescape reverts');
 

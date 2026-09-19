@@ -52,6 +52,7 @@ class Assets
                 'unsaved' => __('statamic-inline-edit::messages.unsaved'),
                 'hint' => __('statamic-inline-edit::messages.hint'),
                 'empty' => __('statamic-inline-edit::messages.empty'),
+                'empty_field' => __('statamic-inline-edit::messages.empty_field'),
                 'conflict' => __('statamic-inline-edit::messages.conflict'),
                 'failed' => __('statamic-inline-edit::messages.failed'),
                 'leave' => __('statamic-inline-edit::messages.leave'),

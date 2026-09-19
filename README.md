@@ -27,10 +27,10 @@ No build step, no Node, no Vite. The addon ships its stylesheet and script as pl
 
 ## What it looks like
 
-A signed-in editor gets a small bar at the bottom of the page. They switch editing on, the
-editable text picks up a dashed outline, they double-click a headline, type, and press Save.
-Everyone else sees the page exactly as before: same HTML, no wrapper elements, no script, no
-attributes. There is nothing to leak because for a visitor nothing is rendered.
+A signed-in editor gets one button docked at the bottom of the window. They switch editing on,
+the editable text picks up a dashed outline, they double-click a headline, type, and press
+Save. Everyone else sees the page exactly as before: same HTML, no wrapper elements, no script,
+no attributes. There is nothing to leak because for a visitor nothing is rendered.
 
 ## Install
 
@@ -166,14 +166,36 @@ Named, not hidden:
   that localization, so the field stops inheriting from its origin. That is what the control
   panel does once you localize a field there.
 
-## Keyboard
+## One thing that looks different while you edit
+
+A `textarea` can hold line breaks that your template does not render, because normal HTML
+collapses them into spaces. While edit mode is on, those fields switch to `pre-wrap` so the
+breaks become visible, which means a long paragraph may re-wrap when you switch editing on.
+
+That is deliberate and it is the safe direction. Without it you would be typing into text whose
+line breaks you cannot see, and the first save would flatten them out of your content for good.
+Switch editing off and the page reads exactly as a visitor sees it again.
+
+## The bar
+
+It docks across the bottom of the window and reserves matching space at the end of the
+document, so it covers none of your page. It cannot get out of the way of another *fixed*
+overlay, though: a cookie dialog or a chat bubble pinned to the bottom corner will share that
+strip with it. No bottom bar anywhere solves that. Switch editing off and the bar is just the
+one toggle again.
+
+## Keyboard and touch
 
 | | |
 |---|---|
-| Double-click, or Enter / Space on a focused field | start editing |
+| Double-click, or a single tap on a touch screen | start editing |
+| Enter / Space on a focused field | start editing, without a mouse |
 | Escape | discard this field |
 | Enter | leave the field (single-line fields) |
 | Cmd/Ctrl + S | save everything |
+
+A single tap only opens a field while edit mode is on, which the person switched on one tap
+earlier. Reading the page is never interrupted.
 
 ## Development
 
@@ -184,7 +206,7 @@ vendor/bin/pint --test
 vendor/bin/phpstan analyse
 
 npm install
-node tests/browser/run.mjs  # 34 checks: everything that only exists in a browser
+node tests/browser/run.mjs  # 46 checks: everything that only exists in a browser
 ```
 
 The two suites answer different questions and neither covers the other. PHP proves the

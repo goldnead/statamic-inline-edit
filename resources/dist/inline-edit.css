@@ -8,7 +8,42 @@
  *
  * Everything is prefixed `sie-`. Nothing here selects an element the site owns
  * except through our own data attributes.
+ *
+ * ## Why a docked band and not a floating pill
+ *
+ * A floating pill covers whatever the site put at the bottom of the page, and
+ * on a real client site that is a cookie banner, a chat bubble or a
+ * back-to-top button. Our own sibling addon puts a consent dialog exactly
+ * there. A pill also changes width with its contents, which moves the Save
+ * button out from under the cursor between one click and the next.
+ *
+ * So: a band across the full width, with the page given matching bottom
+ * padding from JavaScript, the way Statamic's own publish bar claims its own
+ * space. The buttons never move, and no content ends up underneath it.
+ *
+ * It does not solve another *fixed* overlay. A cookie dialog or a chat bubble
+ * pinned to the bottom corner is outside the document flow, so reserving
+ * space at the end of the document does nothing for it, and the two will
+ * share that strip. For those, the bar publishes its height as
+ * `--sie-bar-height` on the root element, so anything that wants to step
+ * aside can: `bottom: calc(1rem + var(--sie-bar-height, 0px))`.
+ *
+ * ## Why the primary action is not green
+ *
+ * Green in Statamic means "that worked", not "do this". It is kept for the
+ * saved message and nothing else. The Statamic control panel's own runtime
+ * colour variables are not available out here on the frontend, so the values
+ * below are fixed rather than inherited.
  */
+
+/* Holds the space the docked bar would otherwise cover. Height is set from
+   JavaScript, because it depends on what the bar is currently showing. */
+.sie-spacer {
+    display: block;
+    width: 100%;
+    flex: none;
+    pointer-events: none;
+}
 
 .sie-bar,
 .sie-bar * {
@@ -20,65 +55,122 @@
 .sie-bar {
     position: fixed;
     z-index: 2147483000;
-    inset-inline-start: 50%;
-    inset-block-end: 20px;
-    transform: translateX(-50%);
+    inset-inline: 0;
+    inset-block-end: 0;
 
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: 12px;
 
-    padding: 8px 10px;
-    border-radius: 10px;
+    padding: 10px 16px;
+    padding-block-end: max(10px, env(safe-area-inset-bottom));
     background: #16181d;
     color: #f4f5f7;
-    box-shadow: 0 8px 30px rgb(0 0 0 / 35%), 0 0 0 1px rgb(255 255 255 / 8%) inset;
+    box-shadow: 0 -1px 0 rgb(255 255 255 / 10%), 0 -8px 24px rgb(0 0 0 / 18%);
 
     font-size: 13px;
     line-height: 1.4;
-    max-width: calc(100vw - 32px);
 }
 
 .sie-bar .sie-btn {
     cursor: pointer;
-    padding: 6px 12px;
+    display: inline-flex;
+    align-items: center;
+
+    /* 44px is the smallest target a thumb hits reliably. The bar is the only
+       way into edit mode on a phone, so it is not a place to save eight
+       pixels. */
+    min-height: 44px;
+    padding: 0 16px;
+
     border-radius: 6px;
-    background: rgb(255 255 255 / 8%);
+    background: rgb(255 255 255 / 10%);
     color: inherit;
     white-space: nowrap;
-    transition: background 120ms ease, opacity 120ms ease;
+    font-weight: 500;
+    transition: background 120ms ease;
 }
 
 .sie-bar .sie-btn:hover:not([disabled]) {
-    background: rgb(255 255 255 / 16%);
+    background: rgb(255 255 255 / 18%);
 }
 
 .sie-bar .sie-btn:focus-visible {
-    outline: 2px solid #5b9dff;
+    outline: 2px solid #60a5fa;
     outline-offset: 2px;
 }
 
+/* Never below about half: on a near-black bar, a dimmer button stops reading
+   as a button at all, and the person cannot tell disabled from absent. The
+   inset edge keeps the shape visible whatever the opacity does. */
 .sie-bar .sie-btn[disabled] {
-    opacity: 0.35;
+    opacity: 0.5;
     cursor: default;
+    box-shadow: inset 0 0 0 1px rgb(255 255 255 / 12%);
 }
 
-.sie-bar .sie-toggle.sie-on {
-    background: #5b9dff;
-    color: #0b1020;
+/* No transition on this one. It is the only readout of whether edit mode is
+   on, and a fade means there is a moment where it says neither. */
+.sie-bar .sie-toggle {
+    transition: none;
+    gap: 8px;
+}
+
+.sie-bar .sie-toggle::before {
+    content: "";
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: rgb(255 255 255 / 30%);
+    box-shadow: inset 0 0 0 1px rgb(255 255 255 / 25%);
+}
+
+/* The `:hover` rule above outranks a plain `.sie-on`, and the pointer is
+ * sitting on this button the instant it is switched on. Without the hover
+ * variant here, the one readout of "edit mode is running" shows the neutral
+ * hover grey for as long as the mouse stays where it clicked, which is most
+ * of the time somebody looks at it.
+ */
+.sie-bar .sie-toggle.sie-on,
+.sie-bar .sie-toggle.sie-on:hover:not([disabled]) {
+    background: #3b82f6;
+    color: #fff;
+}
+
+.sie-bar .sie-toggle.sie-on:hover:not([disabled]) {
+    background: #2b6fe0;
+}
+
+.sie-bar .sie-toggle.sie-on::before {
+    background: #fff;
+    box-shadow: none;
 }
 
 .sie-bar .sie-primary:not([disabled]) {
-    background: #3ecf8e;
-    color: #06231a;
+    background: #3b82f6;
+    color: #fff;
 }
 
 .sie-bar .sie-primary:hover:not([disabled]) {
-    background: #34b87e;
+    background: #2b6fe0;
 }
 
+/* Editing off: one button, nothing else. There is nothing to save and nothing
+   to discard, and two dead buttons on a client's live page look like something
+   that broke rather than something that is waiting. */
+.sie-bar.sie-idle .sie-save,
+.sie-bar.sie-idle .sie-discard {
+    display: none;
+}
+
+/* The elastic middle. Everything else keeps its natural width, so the buttons
+   sit in the same place in every state and a second click lands where the
+   first one did. */
 .sie-bar .sie-count {
-    opacity: 0.65;
+    flex: 1;
+    min-width: 0;
+    opacity: 0.7;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -86,37 +178,68 @@
 
 .sie-bar .sie-status {
     white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 40ch;
 }
 
 .sie-bar .sie-status.sie-ok {
-    color: #3ecf8e;
+    color: #4ade80;
 }
 
 .sie-bar .sie-status.sie-bad {
     color: #ff8087;
-    white-space: normal;
-    max-width: 40ch;
+}
+
+@media (max-width: 30rem) {
+    .sie-bar {
+        gap: 8px;
+        padding-inline: 10px;
+    }
+
+    .sie-bar .sie-btn {
+        padding: 0 12px;
+    }
+
+    .sie-bar .sie-count {
+        font-size: 12px;
+    }
+
+    /* On a phone there is no room for both the hint and the buttons, and a
+       hint clipped to "Tap o…" is worse than none. The count stays, because a
+       number still fits and it is the one thing that must not be missed.
+
+       Hidden rather than removed: it is the flexible middle, and taking it out
+       of the layout would bunch every button against the left edge. */
+    .sie-bar .sie-count.sie-hint {
+        visibility: hidden;
+    }
 }
 
 /* The fields themselves. Nothing applies until edit mode is on, so an editor
    who is only reading sees the page exactly as a visitor does. */
 
 .sie-editing [data-sie-field] {
-    outline: 1px dashed rgb(91 157 255 / 55%);
+    outline: 1px dashed rgb(59 130 246 / 55%);
     outline-offset: 3px;
     border-radius: 2px;
     cursor: text;
+
+    /* Without this, a browser waits ~300ms on every tap to see whether a
+       double-tap-to-zoom is coming, and the field opens late or not at all. */
+    touch-action: manipulation;
+
     transition: background 120ms ease, outline-color 120ms ease;
 }
 
 .sie-editing [data-sie-field]:hover {
-    outline-color: rgb(91 157 255 / 100%);
-    background: rgb(91 157 255 / 8%);
+    outline-color: rgb(59 130 246 / 100%);
+    background: rgb(59 130 246 / 8%);
 }
 
 .sie-editing [data-sie-field].sie-active {
-    outline: 2px solid #5b9dff;
-    background: rgb(91 157 255 / 10%);
+    outline: 2px solid #3b82f6;
+    background: rgb(59 130 246 / 10%);
 }
 
 /* A textarea's line breaks have to survive the round trip through innerText,
@@ -125,11 +248,34 @@
     white-space: pre-wrap;
 }
 
-/* An empty field has no box to click. Give it one, and say what it is. */
+/* An empty field has no box to click. Give it one, and say which field it is.
+ *
+ * The chip resets its own typography on purpose. Inherited, the placeholder
+ * picks up whatever the host site does to that element, and in a 48px display
+ * heading a word like "Empty" stops looking like a control and starts looking
+ * like the headline.
+ */
 .sie-editing [data-sie-field].sie-empty::before {
     content: attr(data-sie-placeholder);
-    opacity: 0.45;
-    font-style: italic;
+
+    display: inline-block;
+    min-width: 8rem;
+    min-height: 1.75em;
+    padding: 0 .6em;
+
+    font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    font-size: 13px;
+    font-style: normal;
+    font-weight: 400;
+    line-height: 1.75em;
+    letter-spacing: normal;
+    text-transform: none;
+    white-space: nowrap;
+
+    color: #5b6170;
+    background: rgb(59 130 246 / 7%);
+    border-radius: 4px;
+    vertical-align: middle;
 }
 
 .sie-editing [data-sie-field].sie-empty.sie-active::before {

@@ -55,6 +55,38 @@
         });
     }
 
+    /**
+     * What an empty field says before anyone has typed in it.
+     *
+     * The field's own label from the blueprint where the tag could supply one,
+     * because "Add subtitle" tells the person which of three empty boxes on
+     * the page they are looking at and a bare "Empty" does not.
+     */
+    function placeholder(node) {
+        var label = node.dataset.sieLabel;
+
+        if (label && L.empty_field) {
+            return L.empty_field.replace(':field', label);
+        }
+
+        return label || L.empty || 'Empty';
+    }
+
+    /**
+     * How many changes are waiting, in the space that is actually available.
+     *
+     * On a phone the middle of the bar is a few dozen pixels between the
+     * toggle and the buttons, and ":count unsaved" does not fit in it. Clipped
+     * to "1 uns…" it is noise; as a bare number next to an enabled Save button
+     * it still says the one thing that matters, which is that something is
+     * pending and how much.
+     */
+    function counted(count) {
+        var narrow = window.matchMedia && window.matchMedia('(max-width: 30rem)').matches;
+
+        return narrow ? String(count) : (L.unsaved || ':count unsaved').replace(':count', count);
+    }
+
     /* ----------------------------------------------------------------- bar */
 
     var bar = document.createElement('div');
@@ -79,14 +111,31 @@
     function paint() {
         var count = dirty().length;
 
-        toggleBtn.textContent = editing ? (L.editing || 'Editing') : (L.edit || 'Edit page');
+        // One label in both states, on purpose. It used to say "Editing" while
+        // on, which reads like an invitation to start rather than a statement
+        // that it is running, and it made the button change width, so the
+        // click that switches editing off landed somewhere other than the
+        // click that switched it on. The dot and the colour carry the state,
+        // and `aria-pressed` carries it for anyone not looking at colour.
+        toggleBtn.textContent = L.edit || 'Edit page';
+        toggleBtn.title = editing ? (L.editing || 'Editing') : '';
+        toggleBtn.setAttribute('aria-pressed', editing ? 'true' : 'false');
         toggleBtn.classList.toggle('sie-on', editing);
 
         countEl.textContent = editing
-            ? (count ? (L.unsaved || ':count unsaved').replace(':count', count) : (L.hint || ''))
+            ? (count ? counted(count) : (L.hint || ''))
             : '';
 
+        // Marked so a narrow screen can drop it. A hint truncated to "Tap o…"
+        // is worse than no hint; a count never is.
+        countEl.classList.toggle('sie-hint', editing && count === 0);
+
         bar.classList.toggle('sie-has-changes', count > 0);
+
+        // With editing off there is nothing that could ever be saved, so Save
+        // and Discard are not disabled, they are absent. A row of dead buttons
+        // on somebody's live page reads as a broken widget.
+        bar.classList.toggle('sie-idle', !editing);
         saveBtn.disabled = busy || count === 0;
         discardBtn.disabled = busy || count === 0;
         saveBtn.textContent = busy ? (L.saving || 'Saving…') : (L.save || 'Save');
@@ -121,7 +170,7 @@
             if (on) {
                 node.setAttribute('tabindex', '0');
                 node.classList.toggle('sie-empty', read(node) === '');
-                if (read(node) === '') node.setAttribute('data-sie-placeholder', L.empty || 'Empty');
+                if (read(node) === '') node.setAttribute('data-sie-placeholder', placeholder(node));
             } else {
                 stopEditing(node);
                 node.removeAttribute('tabindex');
@@ -180,6 +229,21 @@
 
         node.addEventListener('dblclick', function (event) {
             if (!editing) return;
+            event.preventDefault();
+            startEditing(node);
+        });
+
+        // A double-click is a mouse gesture. On a touch screen a double-tap is
+        // zoom, and two quick taps on text are as likely to be a selection as
+        // anything else, so `dblclick` either never fires or fires after the
+        // browser has already zoomed. Without this the bar appears on a phone
+        // and nothing on the page can be opened — the feature is visible and
+        // absent at the same time.
+        //
+        // A single tap is safe here because it only counts while edit mode is
+        // on, which the person switched on deliberately one tap earlier.
+        node.addEventListener('pointerup', function (event) {
+            if (!editing || event.pointerType !== 'touch' || node.isContentEditable) return;
             event.preventDefault();
             startEditing(node);
         });
@@ -332,6 +396,45 @@
     });
 
     document.body.appendChild(bar);
+
+    // Give the bar its own space at the end of the document instead of letting
+    // it lie on top of whatever the page put down there. A spacer element
+    // rather than padding on <body>, because the site may well set that itself
+    // and a fight over one property is a fight this addon should not pick.
+    //
+    // This cannot help with another *fixed* overlay — a cookie dialog or a
+    // chat bubble pinned to the bottom will still share the space, and no
+    // bottom bar anywhere solves that. It is in the README.
+    var spacer = document.createElement('div');
+    spacer.className = 'sie-spacer';
+    spacer.setAttribute('aria-hidden', 'true');
+    document.body.appendChild(spacer);
+
+    function reserveSpace() {
+        var height = bar.offsetHeight;
+
+        spacer.style.height = height + 'px';
+
+        // Published so anything else pinned to the bottom of the window can
+        // step aside. A fixed overlay is outside the document flow, so the
+        // spacer above does nothing for it, and a sibling addon that puts a
+        // consent dialog down there needs a number rather than a promise:
+        //
+        //   bottom: calc(1rem + var(--sie-bar-height, 0px));
+        document.documentElement.style.setProperty('--sie-bar-height', height + 'px');
+    }
+
+    reserveSpace();
+    window.addEventListener('resize', reserveSpace);
+
+    // Repaint when the bar crosses into or out of the narrow layout, because
+    // that is where the change count switches between "1 unsaved" and "1".
+    // Bound to the query rather than to every resize event: it fires twice in
+    // a session instead of a hundred times during a drag.
+    if (window.matchMedia) {
+        window.matchMedia('(max-width: 30rem)').addEventListener('change', paint);
+    }
+    if (window.ResizeObserver) new ResizeObserver(reserveSpace).observe(bar);
 
     var wasEditing = false;
     try {

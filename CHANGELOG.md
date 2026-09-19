@@ -23,8 +23,30 @@ Edit `text`, `textarea` and `integer` fields on the live page. Mark a field with
 Refused on purpose, with a message rather than silently: the slug, collections with revisions
 enabled, any fieldtype not on the list, and any handle the page never offered.
 
-Tested with 18 PHP tests for the tag and the save route, and 34 browser checks against the
+Tested with 19 PHP tests for the tag and the save route, and 52 browser checks against the
 shipped script.
+
+### What a round of review changed
+
+The editor was built, photographed on a real Statamic page, and handed to a reviewer who saw
+only the pictures. Three passes:
+
+- **The bar was a floating pill.** It covered whatever the site had at the bottom, and it grew
+  with its own contents, so the Save button moved between one click and the next. It is now a
+  band docked across the width that reserves matching space at the end of the document and
+  publishes its height as `--sie-bar-height` for anything else pinned down there.
+- **There was no way into a field on a phone.** `dblclick` is a mouse gesture; on a touch
+  screen a double tap is zoom. A single tap now opens a field while edit mode is on, targets
+  are 44px, and the change count shortens to fit the narrow bar.
+- **The primary action was green.** In Statamic green means "that worked". It is blue now, and
+  green is left to the saved message.
+- **The empty placeholder inherited the page's typography** and said only "Empty". It is its
+  own chip now, with its own font, carrying the field's name from the blueprint.
+- **The on state was unreadable**, because the generic hover rule outranked it and the pointer
+  is on the button the instant it is switched on. The label also changed, which read like an
+  invitation and moved the button under the cursor. One label now, state on a dot, the colour
+  and `aria-pressed`.
+- **Save and Discard sat there disabled** with editing off. They are absent instead.
 
 One bug worth naming because it was found before release and would have been hard to see
 afterwards: switching edit mode on gives multiline fields `white-space: pre-wrap`, which makes
