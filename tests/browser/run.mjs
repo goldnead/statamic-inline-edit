@@ -526,8 +526,50 @@ if (await page.locator('.sie-launch').isVisible()) {
 }
 
 const body = page.locator('[data-sie-field="body"]');
+
+// The whole promise of editing in place is that the page does not become a
+// form when you click into it. Measured, not eyeballed.
+const before = await page.evaluate(() => {
+    const el = document.querySelector('[data-sie-field="body"]');
+    const h2 = el.querySelector('h2');
+
+    return {
+        page: document.body.scrollHeight,
+        block: Math.round(el.getBoundingClientRect().height),
+        heading: getComputedStyle(h2).fontSize + '/' + getComputedStyle(h2).fontFamily,
+    };
+});
+
 await body.dblclick();
 await page.waitForSelector('.sie-rich', { timeout: 15000 });
+await page.waitForTimeout(300);
+
+const after = await page.evaluate(() => {
+    const el = document.querySelector('[data-sie-field="body"]');
+    const h2 = el.querySelector('h2');
+
+    return {
+        page: document.body.scrollHeight,
+        block: Math.round(el.getBoundingClientRect().height),
+        heading: getComputedStyle(h2).fontSize + '/' + getComputedStyle(h2).fontFamily,
+    };
+});
+
+check(
+    'opening it does not move the page',
+    Math.abs(after.page - before.page) <= 2,
+    before.page + 'px became ' + after.page + 'px'
+);
+check(
+    'and the block keeps its height',
+    Math.abs(after.block - before.block) <= 2,
+    before.block + 'px became ' + after.block + 'px'
+);
+check(
+    'the heading is still the page heading',
+    after.heading === before.heading,
+    before.heading + ' became ' + after.heading
+);
 
 check('the page element itself becomes the editor', await body.evaluate((el) => el.classList.contains('sie-rich-host')));
 check('not a box over it', (await page.locator('.sie-pop').count()) === 0 || (await page.locator('.sie-pop').isHidden()));
