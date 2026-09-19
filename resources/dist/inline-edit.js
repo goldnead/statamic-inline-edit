@@ -635,18 +635,47 @@
 
         if (!handle) return;
 
-        try {
-            var doc = frame.contentDocument;
+        // `load` is not the moment the form exists.
+        //
+        // The control panel is a Vue application: the document has finished
+        // loading long before the publish form has been mounted into it. A
+        // single lookup here finds nothing, returns quietly, and the overlay
+        // opens at the top of the form with no sign that anything was meant
+        // to happen. So: look again until it is there, or give up.
+        //
+        // What to look for took three tries. `data-handle` and `name` do not
+        // exist in the Statamic 6 control panel at all. The id
+        // `field_<handle>` is the right shape, but only fieldtypes that
+        // render a single input actually carry it: a list, a Bard or a Grid
+        // has no such element. What every field does have is its label,
+        // pointing at that id. So: the input when there is one, the label
+        // otherwise.
+        var deadline = Date.now() + 8000;
 
-            if (!doc) return;
+        (function find() {
+            if (frame.dataset.sieField !== handle) return; // another field was opened
 
-            var target = doc.querySelector(
-                '[data-handle="' + handle + '"], [name="' + handle + '"], #field_' + handle
-            );
+            var target = null;
 
-            if (!target) return;
+            try {
+                var doc = frame.contentDocument;
 
-            var box = target.closest('[data-handle]') || target;
+                target = doc && (
+                    doc.getElementById('field_' + handle)
+                    || doc.querySelector('label[for="field_' + handle + '"]')
+                );
+            } catch (e) {
+                return; // cross-origin: the overlay works, it just does not scroll
+            }
+
+            if (!target) {
+                if (Date.now() < deadline) setTimeout(find, 150);
+
+                return;
+            }
+
+            // Outline the whole field, not the label on top of it.
+            var box = target.tagName === 'LABEL' && target.parentElement ? target.parentElement : target;
 
             box.scrollIntoView({ block: 'center' });
 
@@ -657,13 +686,12 @@
             box.style.outline = '2px solid #3b82f6';
             box.style.outlineOffset = '4px';
 
+            // Four seconds, not two: the form has just scrolled, and the
+            // person's eyes arrive after the animation does.
             setTimeout(function () {
                 try { box.style.outline = before; } catch (e) { /* frame gone */ }
-            }, 2500);
-        } catch (e) {
-            // Cross-origin, or the control panel moved. The overlay still
-            // works, it just opens where it opens.
-        }
+            }, 4000);
+        })();
     });
 
     function startEditing(node) {

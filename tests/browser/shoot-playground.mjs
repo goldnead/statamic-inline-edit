@@ -134,7 +134,8 @@ await shot('10-markdown-source');
 await page.keyboard.press('Escape');
 
 await page.locator('[data-sie-field="schlagworte"]').dblclick();
-await page.waitForTimeout(3000);
+// Inside the window in which the opened field is still outlined.
+await page.waitForTimeout(2000);
 console.log('cp overlay open = ' + (await page.locator('.sie-panel').isVisible()));
 await shot('11-control-panel');
 
@@ -155,7 +156,7 @@ await shot('12-phone-markdown');
 await page.keyboard.press('Escape');
 
 await page.locator('[data-sie-field="schlagworte"]').dispatchEvent('pointerup', { pointerType: 'touch', bubbles: true });
-await page.waitForTimeout(3000);
+await page.waitForTimeout(2000);
 await shot('13-phone-control-panel');
 
 await browser.close();
