@@ -679,6 +679,14 @@
 
             box.scrollIntoView({ block: 'center' });
 
+            // Once more a moment later. The heavy fieldtypes above this one,
+            // a Bard or a markdown editor, mount after the first ones and
+            // push everything below them down, so the field that was just
+            // centred ends up at the bottom edge.
+            setTimeout(function () {
+                try { box.scrollIntoView({ block: 'center' }); } catch (e) { /* frame gone */ }
+            }, 900);
+
             // Styled inline, not with a class: our stylesheet is not loaded
             // inside the control panel, so a class there would name a rule
             // that does not exist.

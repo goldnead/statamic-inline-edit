@@ -117,7 +117,19 @@ source round-trips byte for byte. The toolbar writes the same syntax you would t
 **cp** is the real control panel in an iframe, not a rebuilt editor. Bard alone is an entire
 editor and an asset picker is an entire browser; a second-rate copy of either is worse than one
 click into the real one. Saving there goes through the control panel's own validation,
-revisions and permissions.
+revisions and permissions. The overlay scrolls to the field you double-clicked and outlines it,
+and the page reloads when you close it.
+
+### Seeing it before you save it
+
+The three non-text kinds cannot show the result in place: only your template knows what a
+toggle reads as, and only the server knows what markdown renders to. So:
+
+- A **control** shows what the field will become next to what it still says, and the page
+  reloads after saving so the template has the last word.
+- A **markdown** field is rendered by the server the moment you close the editor, through the
+  same fieldtype the page uses. What you see there is what will be there. Nothing is written
+  until you press Save.
 
 The slug is refused outright and cannot be enabled. Changing it moves the page out from under
 the person editing it and breaks every link to it.
@@ -181,6 +193,10 @@ php artisan vendor:publish --tag=statamic-inline-edit-config
 | `multiline` | `textarea` | Of the text ones, where Enter inserts a line break instead of leaving the field. |
 | `inject` | `true` | Places the editor before `</body>` automatically. Switch off and use `{{ inline_edit:assets }}` if a Content Security Policy needs the script somewhere specific. |
 | `max_length` | `100000` | A ceiling on any one field, independent of the blueprint. |
+
+Two routes are registered under the action prefix: `save`, which writes, and `preview`, which
+renders a markdown value through its own fieldtype and writes nothing. Both check the same
+permission as the control panel, and both answer 404 when `enabled` is off.
 
 ## Not in this version
 
