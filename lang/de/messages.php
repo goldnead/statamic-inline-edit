@@ -25,6 +25,10 @@ return [
     'heading' => 'Überschrift',
     'list' => 'Liste',
     'link' => 'Link',
+    'badge_text' => 'Text',
+    'badge_control' => 'Wert',
+    'badge_source' => 'Markdown',
+    'badge_cp' => 'Control Panel',
 
     'error_auth' => 'Du bist nicht angemeldet.',
     'error_forbidden' => 'Du darfst diesen Eintrag nicht bearbeiten.',

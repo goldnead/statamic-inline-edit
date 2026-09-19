@@ -29,7 +29,36 @@ template will make of the new value. Text does not: what you typed is what is th
 A toggle travels to the server as a real boolean rather than a string, so `false` and "" stay
 different things to the blueprint.
 
-30 PHP tests, 74 browser checks.
+### What the review changed, again
+
+Same loop as version 1: built, photographed on a real page, handed to a reviewer who saw only
+the pictures.
+
+- **The one field version 2 was built for had no outline at all.** A markdown block is a
+  heading, paragraphs and a list; wrapped in a `span` it has no box, so nothing was drawn
+  around it, and neither was the outline that says "unsaved". A markdown field now defaults to
+  a `div`, and any marker that contains block content becomes one.
+- **Nobody could see what they were saving in markdown.** Type into a monospace box, close it,
+  the page looks exactly as before, press Save. Closing the source editor now asks the server
+  to render the value through its own fieldtype and puts that on the page. The one rule this
+  addon exists to keep is that nobody saves something they have not looked at.
+- **A select looked like a text field.** The reset that protects the bar from the host site's
+  CSS also strips a dropdown of its chevron and a date input of its calendar button. Handed
+  back explicitly.
+- **A flipped toggle looked exactly like an untouched one** until the save and the reload. The
+  field now shows what it will become, next to what it still says.
+- **The toolbar was five unlabelled symbols.** It is five words.
+- **On a phone the only state was a bare digit.** The count moved onto the Save button, where
+  it has a word next to it saying what it counts.
+- The control panel overlay scrolls to the field that was double-clicked and outlines it,
+  instead of opening the whole form at the top.
+
+Tried and reverted in the same round: an always-visible badge naming each field's kind. On a
+row of four fields it lands on the neighbour's value, whichever side it is placed. It shows on
+hover, and the control that opens names its own kind in its header, which is what a phone
+gets.
+
+35 PHP tests, 86 browser checks.
 
 ## 1.0.0
 

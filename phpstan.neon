@@ -22,4 +22,6 @@ parameters:
         -
             identifier: method.notFound
             message: '#Call to an undefined method Statamic\\Contracts\\Entries\\Entry::#'
-            path: src/Http/Controllers/SaveController.php
+            paths:
+                - src/Http/Controllers/SaveController.php
+                - src/Http/Controllers/PreviewController.php

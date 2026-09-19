@@ -243,12 +243,12 @@ earlier. Reading the page is never interrupted.
 
 ```bash
 composer install
-vendor/bin/phpunit          # 30 tests: the tag and the save route
+vendor/bin/phpunit          # 35 tests: the tag and the save route
 vendor/bin/pint --test
 vendor/bin/phpstan analyse
 
 npm install
-node tests/browser/run.mjs  # 74 checks: everything that only exists in a browser
+node tests/browser/run.mjs  # 86 checks: everything that only exists in a browser
 ```
 
 The two suites answer different questions and neither covers the other. PHP proves the

@@ -72,11 +72,36 @@
         return pending.has(node) ? pending.get(node) : read(node);
     }
 
-    function setPending(node, value) {
+    function setPending(node, value, shown) {
         pending.set(node, value);
         node.classList.add('sie-changed');
+
+        // What the page will say once this is saved, next to what it still
+        // says. Without it a flipped toggle looks exactly like an untouched
+        // one until the save and the reload, and the counter in the bar does
+        // not answer "which one did I change?".
+        if (shown) {
+            node.dataset.sieGhost = shown;
+        } else {
+            delete node.dataset.sieGhost;
+        }
+
         paint();
     }
+
+    function clearPending(node) {
+        pending.delete(node);
+        node.classList.remove('sie-changed');
+        delete node.dataset.sieGhost;
+    }
+
+    /** Which of the four kinds this field is, said out loud on the page. */
+    var BADGES = {
+        text: L.badge_text || 'Text',
+        control: L.badge_control || 'Wert',
+        source: L.badge_source || 'Markdown',
+        cp: L.badge_cp || 'Control Panel',
+    };
 
     /**
      * What an empty field says before anyone has typed in it.
@@ -107,7 +132,9 @@
     function counted(count) {
         var narrow = window.matchMedia && window.matchMedia('(max-width: 30rem)').matches;
 
-        return narrow ? String(count) : (L.unsaved || ':count unsaved').replace(':count', count);
+        // Empty when narrow: the number has moved onto the Save button, where
+        // it has a word next to it saying what it counts.
+        return narrow ? '' : (L.unsaved || ':count unsaved').replace(':count', count);
     }
 
     /* ----------------------------------------------------------------- bar */
@@ -161,7 +188,15 @@
         bar.classList.toggle('sie-idle', !editing);
         saveBtn.disabled = busy || count === 0;
         discardBtn.disabled = busy || count === 0;
-        saveBtn.textContent = busy ? (L.saving || 'Saving…') : (L.save || 'Save');
+
+        // On a narrow bar the count moves onto the button rather than sitting
+        // beside it as a bare digit. "Speichern 2" is short and says what the
+        // number means; a lone "2" between two buttons reads like a leftover.
+        var onButton = count > 0 && window.matchMedia && window.matchMedia('(max-width: 30rem)').matches;
+
+        saveBtn.textContent = busy
+            ? (L.saving || 'Saving…')
+            : (L.save || 'Save') + (onButton ? ' ' + count : '');
     }
 
     function status(message, kind) {
@@ -194,6 +229,7 @@
         nodes.forEach(function (node) {
             if (on) {
                 node.setAttribute('tabindex', '0');
+                node.dataset.sieBadge = BADGES[node.dataset.sieMode || 'text'] || '';
                 node.classList.toggle('sie-empty', read(node) === '');
                 if (read(node) === '') node.setAttribute('data-sie-placeholder', placeholder(node));
             } else {
@@ -253,9 +289,67 @@
     var popFor = null;
 
     function closePop() {
+        var was = popFor;
+
         pop.hidden = true;
         pop.innerHTML = '';
-        if (popFor) { popFor.focus(); popFor = null; }
+        popFor = null;
+
+        if (!was) return;
+
+        was.focus();
+
+        // Closing the source editor is the moment to show what was written.
+        // Until this existed, a markdown edit was invisible on the page until
+        // after the save and the reload: the person typed into a monospace
+        // box, closed it, saw nothing change, and saved something they had
+        // never looked at.
+        if (was.dataset.sieMode === 'source' && pending.has(was)) preview(was);
+    }
+
+    /**
+     * Replace the rendered block with what the server makes of the pending
+     * source. The value on the page is now ahead of the value in the file,
+     * which is exactly what the pending outline says.
+     *
+     * Rendered by the server's own fieldtype, never by a markdown library
+     * here: a second renderer disagrees with the real one sooner or later,
+     * and a preview that lies is worse than no preview.
+     */
+    function preview(node) {
+        if (!config.previewUrl) return;
+
+        node.classList.add('sie-previewing');
+
+        fetch(config.previewUrl, {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+                'X-CSRF-TOKEN': config.csrf,
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            body: JSON.stringify({
+                id: node.dataset.sieId,
+                field: node.dataset.sieField,
+                value: pending.get(node)
+            })
+        })
+            .then(function (response) { return response.ok ? response.json() : null; })
+            .then(function (body) {
+                node.classList.remove('sie-previewing');
+
+                if (!body || typeof body.html !== 'string') return;
+
+                node.innerHTML = body.html;
+            })
+            .catch(function () {
+                // No preview is a smaller problem than a broken page. The
+                // rendered output simply stays as it was, and the pending
+                // outline still says something is waiting.
+                node.classList.remove('sie-previewing');
+            });
     }
 
     /**
@@ -289,9 +383,13 @@
         pop.innerHTML = '';
         pop.className = 'sie-pop';
 
+        // Field name and kind. On a phone there is no hover, so the badge on
+        // the page never appears and this header is where the person finds
+        // out what they just opened.
         var label = document.createElement('span');
         label.className = 'sie-pop-label';
-        label.textContent = node.dataset.sieLabel || node.dataset.sieField;
+        label.textContent = (node.dataset.sieLabel || node.dataset.sieField)
+            + ' · ' + (node.dataset.sieBadge || '');
         pop.appendChild(label);
 
         var current = valueOf(node) === read(node) ? (node.dataset.sieRaw || '') : valueOf(node);
@@ -308,7 +406,7 @@
                 on = !on;
                 input.setAttribute('aria-pressed', on ? 'true' : 'false');
                 input.textContent = on ? (L.on || 'An') : (L.off || 'Aus');
-                setPending(node, on);
+                setPending(node, on, on ? (L.on || 'An') : (L.off || 'Aus'));
             });
         } else if (node.dataset.sieType === 'select') {
             input = document.createElement('select');
@@ -336,14 +434,16 @@
             });
 
             input.value = current;
-            input.addEventListener('change', function () { setPending(node, input.value); });
+            input.addEventListener('change', function () {
+                setPending(node, input.value, input.options[input.selectedIndex].textContent);
+            });
         } else {
             input = document.createElement('input');
             input.className = 'sie-input';
             input.type = 'date';
             // A stored date can carry a time; the input only takes the day.
             input.value = (current || '').slice(0, 10);
-            input.addEventListener('change', function () { setPending(node, input.value); });
+            input.addEventListener('change', function () { setPending(node, input.value, input.value); });
         }
 
         pop.appendChild(input);
@@ -375,6 +475,12 @@
 
         var source = pending.has(node) ? pending.get(node) : sourceOf(node);
 
+        var head = document.createElement('span');
+        head.className = 'sie-pop-label';
+        head.textContent = (node.dataset.sieLabel || node.dataset.sieField)
+            + ' · ' + (node.dataset.sieBadge || '');
+        pop.appendChild(head);
+
         var tools = document.createElement('div');
         tools.className = 'sie-tools';
         pop.appendChild(tools);
@@ -384,18 +490,20 @@
         area.value = source;
         area.spellcheck = true;
 
+        // Words, not symbols. `B I # • ↗` needs five guesses, and a `title`
+        // is invisible until the pointer has already stopped on one of them
+        // and never appears at all on a phone.
         [
-            { label: 'B', title: L.bold || 'Fett', wrap: ['**', '**'] },
-            { label: 'I', title: L.italic || 'Kursiv', wrap: ['*', '*'] },
-            { label: '#', title: L.heading || 'Überschrift', line: '## ' },
-            { label: '•', title: L.list || 'Liste', line: '- ' },
-            { label: '↗', title: L.link || 'Link', wrap: ['[', '](https://)'] },
+            { label: L.bold || 'Fett', wrap: ['**', '**'] },
+            { label: L.italic || 'Kursiv', wrap: ['*', '*'] },
+            { label: L.heading || 'Überschrift', line: '## ' },
+            { label: L.list || 'Liste', line: '- ' },
+            { label: L.link || 'Link', wrap: ['[', '](https://)'] },
         ].forEach(function (tool) {
             var btn = document.createElement('button');
             btn.type = 'button';
             btn.className = 'sie-tool';
             btn.textContent = tool.label;
-            btn.title = tool.title;
             btn.addEventListener('click', function () {
                 tool.line ? prefixLine(area, tool.line) : wrapSelection(area, tool.wrap[0], tool.wrap[1]);
                 setPending(node, area.value);
@@ -490,6 +598,7 @@
 
         panelTitle.textContent = node.dataset.sieLabel || node.dataset.sieField;
         frame.title = panelTitle.textContent;
+        frame.dataset.sieField = node.dataset.sieField || '';
         frame.src = url;
         panel.hidden = false;
         document.documentElement.classList.add('sie-panel-open');
@@ -508,6 +617,54 @@
     }
 
     panelClose.addEventListener('click', closePanel);
+
+    /**
+     * Scroll the control panel to the field that was double-clicked.
+     *
+     * Without it, a double-click on one chip opens the whole entry form at
+     * the top and leaves the person to find their field among twenty. Same
+     * origin, so we can reach in.
+     *
+     * Everything here is best-effort and silent. The control panel's own DOM
+     * is not our contract: a future release may rename the attribute, and
+     * when it does the overlay should still open at the top rather than throw
+     * on somebody's live page.
+     */
+    frame.addEventListener('load', function () {
+        var handle = frame.dataset.sieField;
+
+        if (!handle) return;
+
+        try {
+            var doc = frame.contentDocument;
+
+            if (!doc) return;
+
+            var target = doc.querySelector(
+                '[data-handle="' + handle + '"], [name="' + handle + '"], #field_' + handle
+            );
+
+            if (!target) return;
+
+            var box = target.closest('[data-handle]') || target;
+
+            box.scrollIntoView({ block: 'center' });
+
+            // Styled inline, not with a class: our stylesheet is not loaded
+            // inside the control panel, so a class there would name a rule
+            // that does not exist.
+            var before = box.style.outline;
+            box.style.outline = '2px solid #3b82f6';
+            box.style.outlineOffset = '4px';
+
+            setTimeout(function () {
+                try { box.style.outline = before; } catch (e) { /* frame gone */ }
+            }, 2500);
+        } catch (e) {
+            // Cross-origin, or the control panel moved. The overlay still
+            // works, it just opens where it opens.
+        }
+    });
 
     function startEditing(node) {
         if (!editing || node.isContentEditable) return;
@@ -676,8 +833,7 @@
                 });
 
                 changed.forEach(function (node) {
-                    pending.delete(node);
-                    node.classList.remove('sie-changed');
+                    clearPending(node);
                     original.set(node, read(node));
                     node.classList.toggle('sie-empty', read(node) === '');
                 });
@@ -704,8 +860,7 @@
             if (pending.has(node)) {
                 // Nothing to put back on the page: what was picked never
                 // showed there. Dropping it is the whole undo.
-                pending.delete(node);
-                node.classList.remove('sie-changed');
+                clearPending(node);
 
                 return;
             }

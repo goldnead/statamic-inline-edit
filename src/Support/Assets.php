@@ -39,7 +39,8 @@ class Assets
     protected function payload(): string
     {
         $data = [
-            'saveUrl' => $this->saveUrl(),
+            'saveUrl' => $this->actionUrl('save'),
+            'previewUrl' => $this->actionUrl('preview'),
             'csrf' => csrf_token(),
             'maxLength' => app(Editor::class)->maxLength(),
             'labels' => [
@@ -66,6 +67,10 @@ class Assets
                 'heading' => __('statamic-inline-edit::messages.heading'),
                 'list' => __('statamic-inline-edit::messages.list'),
                 'link' => __('statamic-inline-edit::messages.link'),
+                'badge_text' => __('statamic-inline-edit::messages.badge_text'),
+                'badge_control' => __('statamic-inline-edit::messages.badge_control'),
+                'badge_source' => __('statamic-inline-edit::messages.badge_source'),
+                'badge_cp' => __('statamic-inline-edit::messages.badge_cp'),
             ],
         ];
 
@@ -79,14 +84,16 @@ class Assets
      * Built from the named route when it is registered, and from the configured
      * action prefix when it is not — which is the case in a package test that
      * boots the provider without core's own route file.
+     *
+     * @param  'save'|'preview'  $action
      */
-    protected function saveUrl(): string
+    protected function actionUrl(string $action): string
     {
-        if (Route::has('statamic.inline-edit.save')) {
-            return route('statamic.inline-edit.save');
+        if (Route::has('statamic.inline-edit.'.$action)) {
+            return route('statamic.inline-edit.'.$action);
         }
 
-        return url(trim((string) config('statamic.routes.action', '!'), '/').'/'.self::HANDLE.'/save');
+        return url(trim((string) config('statamic.routes.action', '!'), '/').'/'.self::HANDLE.'/'.$action);
     }
 
     /**

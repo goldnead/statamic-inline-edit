@@ -254,30 +254,28 @@ console.log('\non a phone');
 
 await page.setViewportSize({ width: 390, height: 844 });
 
+const saveBox = await save.boundingBox();
 check(
     'the buttons still fit side by side',
-    (await save.boundingBox()).x + (await save.boundingBox()).width <= 390,
-    'Save runs off the edge'
+    saveBox.x + saveBox.width <= 390,
+    'Save ends at ' + Math.round(saveBox.x + saveBox.width) + ', label "' + (await save.textContent()) + '"'
 );
 check(
     'and the toggle is still reachable',
     (await toggle.boundingBox()).x >= 0 && (await toggle.boundingBox()).height >= 44
 );
 
-// The middle is a few dozen pixels wide here. The long form would be clipped
-// to "1 uns…", so the count drops to the number and stays readable.
+// The middle is a few dozen pixels wide here, so the count moves onto the
+// Save button. A bare "1" between two buttons reads like a leftover; next to
+// the word it says what it counts.
 await page
-    .waitForFunction(() => document.querySelector('.sie-count').textContent === '1', { timeout: 3000 })
+    .waitForFunction(() => document.querySelector('.sie-save').textContent.trim() === 'Save 1', { timeout: 3000 })
     .catch(() => {});
+check('the count rides on the Save button', (await save.textContent()).trim() === 'Save 1', JSON.stringify(await save.textContent()));
+check('and the middle is left empty rather than clipped', (await count.textContent()) === '');
 check(
-    'the count fits instead of being clipped',
-    (await count.textContent()) === '1',
-    'got "' + (await count.textContent()) + '"'
-);
-check(
-    'and it is not overflowing its box',
-    await count.evaluate((el) => el.scrollWidth <= el.clientWidth + 1),
-    'scroll ' + (await count.evaluate((el) => el.scrollWidth)) + ' vs client ' + (await count.evaluate((el) => el.clientWidth))
+    'nothing overflows its box',
+    await save.evaluate((el) => el.scrollWidth <= el.clientWidth + 1)
 );
 
 await page.setViewportSize({ width: 1100, height: 800 });
@@ -387,6 +385,50 @@ const body2 = page.locator('[data-sie-field="body"]');
 const hero = page.locator('[data-sie-field="hero"]');
 const popover = page.locator('.sie-pop');
 
+console.log('\ntelling the four kinds apart');
+
+// Until this existed the only difference between a text field and a whole
+// control panel was the mouse cursor: invisible in a screenshot, absent on a
+// phone, and arriving only once the pointer is already there.
+const badges = await page.evaluate(() =>
+    Array.from(document.querySelectorAll('[data-sie-field]')).map((n) => [n.dataset.sieMode, n.dataset.sieBadge].join(':'))
+);
+check(
+    'every field says which kind it is',
+    badges.every((b) => b.split(':')[1]),
+    JSON.stringify(badges)
+);
+check('and they are not all the same word', new Set(badges.map((b) => b.split(':')[1])).size === 4, JSON.stringify(badges));
+
+// Quiet until asked. Always-on was tried and reverted: on a row of four
+// fields the badge of one sits on the value of the next.
+const resting = await page.evaluate(() =>
+    Array.from(document.querySelectorAll('[data-sie-field]')).map((n) => getComputedStyle(n, '::after').opacity)
+);
+check('no badge shouts at rest', resting.every((o) => parseFloat(o) === 0), JSON.stringify(resting));
+
+await page.locator('[data-sie-field="belegung"]').hover();
+await page.waitForTimeout(250);
+check(
+    'but hovering one names its kind',
+    parseFloat(await page.locator('[data-sie-field="belegung"]').evaluate((el) => getComputedStyle(el, '::after').opacity)) > 0.5
+);
+
+check(
+    'and nothing makes a phone scroll sideways',
+    !(await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1))
+);
+
+// A span wrapping a heading, a paragraph and a list has no box of its own, so
+// the outline that says "editable" was never drawn on the one field version 2
+// was built for.
+const mdBox = await page.locator('[data-sie-field="body"]').boundingBox();
+check(
+    'a markdown block is a block, so its outline is drawn',
+    (await page.locator('[data-sie-field="body"]').evaluate((el) => getComputedStyle(el).display)) === 'block' && mdBox.height > 40,
+    JSON.stringify(mdBox)
+);
+
 console.log('\na toggle');
 
 await toggle2.dblclick();
@@ -401,6 +443,11 @@ check(
     (await toggle2.innerText()) === 'ja',
     'the template decides what a toggle reads as, so only a reload can show it'
 );
+check(
+    'but the field shows what it will become',
+    (await toggle2.getAttribute('data-sie-ghost')) === 'Off',
+    'otherwise a flipped toggle looks exactly like an untouched one'
+);
 
 await page.locator('.sie-pop-done').click();
 check('the control closes', await popover.isHidden());
@@ -413,8 +460,15 @@ const choices = await page.locator('.sie-pop select option').allTextContents();
 check('offers the blueprint choices plus a way to clear', JSON.stringify(choices) === '["—","Offen","Ausgebucht"]', JSON.stringify(choices));
 check('with the stored one selected', (await page.locator('.sie-pop select').inputValue()) === 'offen');
 
+check(
+    'and it still looks like a dropdown',
+    (await page.locator('.sie-pop select').evaluate((el) => getComputedStyle(el).appearance)) !== 'none',
+    'the reset strips the chevron, and what is left reads as a text field'
+);
+
 await page.locator('.sie-pop select').selectOption('voll');
 check('picking another counts', (await count.textContent()) === '2 unsaved');
+check('and names the choice on the page', (await select2.getAttribute('data-sie-ghost')) === 'Ausgebucht');
 await page.keyboard.press('Escape');
 
 console.log('\nmarkdown');
@@ -427,15 +481,36 @@ check(
     JSON.stringify(source)
 );
 
+const toolLabels = await page.locator('.sie-tool').allTextContents();
+check(
+    'the toolbar buttons are words, not symbols',
+    JSON.stringify(toolLabels) === '["Bold","Italic","Heading","List","Link"]',
+    JSON.stringify(toolLabels)
+);
+
 await page.locator('.sie-area').evaluate((el) => el.setSelectionRange(3, 14));
-await page.locator('.sie-tool[title="Bold"]').click();
+await page.locator('.sie-tool', { hasText: 'Bold' }).click();
 check(
     'the toolbar writes markdown around the selection',
     (await page.locator('.sie-area').inputValue()).startsWith('## **Ein Kapitel**'),
     JSON.stringify(await page.locator('.sie-area').inputValue())
 );
 
+// Nobody may save something they have not looked at. Closing the source
+// editor asks the server what it will render and puts that on the page.
+await context.route('**/statamic-inline-edit/preview', (route) =>
+    route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ html: '<h2>Gerendert</h2>' }) })
+);
+
 await page.keyboard.press('Escape');
+await page.waitForFunction(() => document.querySelector('[data-sie-field="body"]').innerText.includes('Gerendert'), { timeout: 5000 }).catch(() => {});
+
+check(
+    'closing the source editor shows what it will look like',
+    (await body2.innerText()).includes('Gerendert'),
+    'otherwise the page keeps the old rendering until after the save'
+);
+
 check('three changes are now pending', (await count.textContent()) === '3 unsaved');
 
 console.log('\nsaving the three of them');

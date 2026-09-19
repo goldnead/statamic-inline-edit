@@ -1,5 +1,6 @@
 <?php
 
+use Goldnead\StatamicInlineEdit\Http\Controllers\PreviewController;
 use Goldnead\StatamicInlineEdit\Http\Controllers\SaveController;
 use Illuminate\Support\Facades\Route;
 
@@ -17,3 +18,14 @@ use Illuminate\Support\Facades\Route;
 Route::post('save', SaveController::class)
     ->middleware('throttle:60,1')
     ->name('inline-edit.save');
+
+/**
+ * Renders a markdown field through its own fieldtype so the editor can see
+ * what they are about to save. Writes nothing.
+ *
+ * Throttled more loosely than the save: it is called on every close of the
+ * source editor, and a person tidying up a long text closes it often.
+ */
+Route::post('preview', PreviewController::class)
+    ->middleware('throttle:180,1')
+    ->name('inline-edit.preview');

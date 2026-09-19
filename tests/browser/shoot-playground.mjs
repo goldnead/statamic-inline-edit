@@ -134,8 +134,28 @@ await shot('10-markdown-source');
 await page.keyboard.press('Escape');
 
 await page.locator('[data-sie-field="schlagworte"]').dblclick();
-await page.waitForTimeout(2500);
+await page.waitForTimeout(3000);
 console.log('cp overlay open = ' + (await page.locator('.sie-panel').isVisible()));
 await shot('11-control-panel');
+
+// The two v2 surfaces that get tight on a phone, and for which the last
+// review had no picture at all.
+await page.keyboard.press('Escape');
+await page.waitForTimeout(1500);
+await page.setViewportSize({ width: 390, height: 844 });
+await page.goto(BASE + '/inline-edit', { waitUntil: 'domcontentloaded' });
+await page.waitForSelector('.sie-bar');
+if (!(await page.locator('.sie-toggle').evaluate((el) => el.classList.contains('sie-on')))) {
+    await page.locator('.sie-toggle').click();
+}
+
+await page.locator('[data-sie-field="body"]').dispatchEvent('pointerup', { pointerType: 'touch', bubbles: true });
+await page.waitForTimeout(500);
+await shot('12-phone-markdown');
+await page.keyboard.press('Escape');
+
+await page.locator('[data-sie-field="schlagworte"]').dispatchEvent('pointerup', { pointerType: 'touch', bubbles: true });
+await page.waitForTimeout(3000);
+await shot('13-phone-control-panel');
 
 await browser.close();

@@ -80,7 +80,8 @@ class Editable extends Tags
             return $text;
         }
 
-        $tag = $this->tagName();
+        $mode = $value instanceof Value ? (app(Editor::class)->modeFor($this->fieldtype($value)) ?? 'text') : 'text';
+        $tag = $this->tagName($mode);
 
         return '<'.$tag.' '.$attributes.'>'.$text.'</'.$tag.'>'.$trailer;
     }
@@ -88,12 +89,11 @@ class Editable extends Tags
     /**
      * The attributes, or null when this field must render bare.
      *
-     * Five gates, in the cheapest-first order. Each one is a separate reason
-     * and they are not interchangeable: switched off, not signed in, the value
-     * is not a real field, the field is nested somewhere we cannot address,
-     * the fieldtype is not one we can safely put a cursor in.
-     */
-    /**
+     * Gates in cheapest-first order, each one a separate reason and none of
+     * them interchangeable: switched off, not signed in, the value is not a
+     * real field, the field is nested somewhere we cannot address, the
+     * fieldtype has no way of being edited at all.
+     *
      * @return array{0: ?string, 1: string} the attributes, and any markup that
      *                                      has to sit next to the element
      */
@@ -359,13 +359,20 @@ class Editable extends Tags
      * sentence already sitting inside its own block element. Pass tag="div"
      * where a span would be wrong.
      */
-    protected function tagName(): string
+    protected function tagName(string $mode = 'text'): string
     {
-        $tag = (string) $this->params->get('tag', 'span');
+        // A markdown field is block content by nature: a heading, paragraphs,
+        // a list. Wrapped in a span it has no box of its own, so the outline
+        // that says "this is editable" is simply not drawn, and neither is
+        // the one that says "this has unsaved changes". The demo page walked
+        // straight into that, which is how it was found.
+        $default = $mode === 'source' ? 'div' : 'span';
+
+        $tag = (string) $this->params->get('tag', $default);
 
         // Anything that is not a plain element name is a template author
         // typing into an attribute we interpolate into markup unescaped.
-        return preg_match('/^[a-z][a-z0-9-]*$/', $tag) ? $tag : 'span';
+        return preg_match('/^[a-z][a-z0-9-]*$/', $tag) ? $tag : $default;
     }
 
     /**

@@ -25,6 +25,10 @@ return [
     'heading' => 'Heading',
     'list' => 'List',
     'link' => 'Link',
+    'badge_text' => 'Text',
+    'badge_control' => 'Value',
+    'badge_source' => 'Markdown',
+    'badge_cp' => 'Control panel',
 
     'error_auth' => 'You are not signed in.',
     'error_forbidden' => 'You may not edit this entry.',
