@@ -64,6 +64,29 @@ class EditableTagTest extends TestCase
     }
 
     #[Test]
+    public function only_a_value_with_real_line_breaks_is_flagged_to_render_them(): void
+    {
+        $this->makeCollection();
+
+        $this->actingAs($this->anEditor());
+
+        $wraps = $this->makeEntry(['title' => 'a', 'intro' => "Two\nLines"], id: 'entry-wraps');
+        $plain = $this->makeEntry(['title' => 'b', 'intro' => 'One paragraph.'], id: 'entry-plain');
+
+        $this->assertStringContainsString(
+            'data-sie-wraps="true"',
+            $this->render('{{ editable:intro }}', $wraps->toAugmentedArray())
+        );
+
+        // No hidden breaks to reveal, so the editor's page must read exactly
+        // as the visitor's does.
+        $this->assertStringNotContainsString(
+            'data-sie-wraps',
+            $this->render('{{ editable:intro }}', $plain->toAugmentedArray())
+        );
+    }
+
+    #[Test]
     public function a_fieldtype_that_is_not_allowed_renders_without_a_marker(): void
     {
         $this->makeCollection();

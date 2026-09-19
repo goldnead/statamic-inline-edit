@@ -243,8 +243,20 @@
 }
 
 /* A textarea's line breaks have to survive the round trip through innerText,
-   so the wrapper has to actually render them. */
-.sie-editing [data-sie-field][data-sie-multiline="true"] {
+   so the wrapper has to actually render them.
+ *
+ * Deliberately NOT under `.sie-editing`. Scoped to edit mode, this style
+ * arrives the moment the toggle is clicked, and the paragraph re-wraps under
+ * the person who just pressed it. Here it is on the element from the first
+ * paint, so switching edit mode on and off never moves anything.
+ *
+ * The server only sets `data-sie-wraps` when the stored value actually
+ * contains a line break, so a textarea holding one paragraph renders exactly
+ * as the visitor sees it. Where it differs, it differs because the content
+ * has breaks that plain HTML would swallow, and an editor who cannot see them
+ * would delete them on the next save without ever knowing they were there.
+ */
+[data-sie-field][data-sie-wraps="true"] {
     white-space: pre-wrap;
 }
 

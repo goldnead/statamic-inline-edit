@@ -179,12 +179,16 @@
 
         // Re-read every field now that the class is on, and only now.
         //
-        // Switching edit mode gives multiline fields `white-space: pre-wrap`,
-        // so the newlines the stored value has, and the rendered page collapses
-        // into spaces, suddenly become visible. innerText changes with them.
-        // Without this, turning editing on marks every textarea on the page as
-        // changed before anyone has touched anything: the counter lies, and a
-        // Save posts fields nobody edited.
+        // This caught a real bug: `white-space: pre-wrap` used to arrive with
+        // edit mode, which made the stored line breaks visible and changed
+        // what innerText reported, so every textarea counted as changed before
+        // anyone touched anything. That cause is gone, the style is now on the
+        // element from the first paint.
+        //
+        // It stays because the rule it enforces is the one that matters: the
+        // baseline must be read in the same state it will be compared in. Any
+        // future rule under `.sie-editing` that touches text rendering would
+        // otherwise reintroduce exactly that bug, silently.
         //
         // Safe to do here because there can be nothing to lose. Fields are only
         // writable while editing is on, and switching it off discards first.

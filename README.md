@@ -166,15 +166,23 @@ Named, not hidden:
   that localization, so the field stops inheriting from its origin. That is what the control
   panel does once you localize a field there.
 
-## One thing that looks different while you edit
+## Line breaks in a textarea
 
 A `textarea` can hold line breaks that your template does not render, because normal HTML
-collapses them into spaces. While edit mode is on, those fields switch to `pre-wrap` so the
-breaks become visible, which means a long paragraph may re-wrap when you switch editing on.
+collapses them into spaces. An editor who cannot see them deletes them on the first save
+without ever knowing they were there, so a field whose stored value really has breaks in it is
+rendered with `pre-wrap` and shows them.
 
-That is deliberate and it is the safe direction. Without it you would be typing into text whose
-line breaks you cannot see, and the first save would flatten them out of your content for good.
-Switch editing off and the page reads exactly as a visitor sees it again.
+Two things follow, both deliberate:
+
+- **Only fields that actually contain a break.** A textarea holding one paragraph renders
+  exactly as a visitor sees it, because there is nothing hidden to reveal.
+- **From the first paint, not when you switch editing on.** Nothing re-wraps under you when
+  you press the toggle. The page an editor reads is the page they edit.
+
+Where the two do differ, it is because the content has breaks that plain HTML swallows. If you
+would rather they showed for visitors too, that is a `| nl2br` on your template, not a setting
+here.
 
 ## The bar
 
@@ -206,7 +214,7 @@ vendor/bin/pint --test
 vendor/bin/phpstan analyse
 
 npm install
-node tests/browser/run.mjs  # 46 checks: everything that only exists in a browser
+node tests/browser/run.mjs  # 55 checks: everything that only exists in a browser
 ```
 
 The two suites answer different questions and neither covers the other. PHP proves the

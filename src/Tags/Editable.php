@@ -63,7 +63,7 @@ class Editable extends Tags
 
         $text = $this->stringify($value instanceof Value ? $value->value() : $value);
 
-        $marker = $this->marker($field, $value);
+        $marker = $this->marker($field, $value, $text);
 
         if ($marker === null) {
             return $text;
@@ -82,7 +82,7 @@ class Editable extends Tags
      * is not a real field, the field is nested somewhere we cannot address,
      * the fieldtype is not one we can safely put a cursor in.
      */
-    protected function marker(string $field, mixed $value): ?string
+    protected function marker(string $field, mixed $value, string $text): ?string
     {
         $editor = app(Editor::class);
 
@@ -127,6 +127,21 @@ class Editable extends Tags
 
         if ($editor->isMultiline($type)) {
             $attributes['data-sie-multiline'] = 'true';
+
+            // Only when the stored value really has line breaks in it.
+            //
+            // A multiline field needs `white-space: pre-wrap` to be editable
+            // without losing those breaks, because ordinary HTML collapses
+            // them into spaces and a save would then write the collapsed text
+            // back. But applying it to every textarea would re-wrap
+            // paragraphs that have no breaks to show, for nothing.
+            //
+            // Flagged from the server rather than measured in the browser, so
+            // the style is on the element from the first paint and the page
+            // never reflows underneath the person reading it.
+            if (str_contains($text, "\n")) {
+                $attributes['data-sie-wraps'] = 'true';
+            }
         }
 
         return collect($attributes)

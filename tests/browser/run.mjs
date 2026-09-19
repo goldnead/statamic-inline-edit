@@ -125,6 +125,14 @@ check(
         Math.round(barBox.height) + 'px'
 );
 
+// The layout an editor reads must be the layout a visitor reads, and it must
+// not jump when the toggle is pressed. Measured across the switch, because
+// this used to break exactly there: pre-wrap arrived with edit mode and
+// re-wrapped every multiline paragraph under the person who clicked.
+const beforeToggle = await page.evaluate(() =>
+    Array.from(document.querySelectorAll('[data-sie-field]')).map((n) => Math.round(n.getBoundingClientRect().height))
+);
+
 console.log('\nediting on');
 
 const toggleWidthBefore = (await toggle.boundingBox()).width;
@@ -139,6 +147,24 @@ let savePosition = Math.round((await save.boundingBox()).x);
 // already running, and the button must not change width under the pointer
 // that is about to click it again.
 const toggleWidthOff = Math.round(toggleWidthBefore);
+const afterToggle = await page.evaluate(() =>
+    Array.from(document.querySelectorAll('[data-sie-field]')).map((n) => Math.round(n.getBoundingClientRect().height))
+);
+check(
+    'nothing on the page re-wraps when edit mode comes on',
+    JSON.stringify(beforeToggle) === JSON.stringify(afterToggle),
+    JSON.stringify(beforeToggle) + ' became ' + JSON.stringify(afterToggle)
+);
+check(
+    'a textarea with real line breaks shows them',
+    (await intro.evaluate((el) => getComputedStyle(el).whiteSpace)) === 'pre-wrap'
+);
+check(
+    'one without them reads exactly as a visitor sees it',
+    (await page.locator('[data-sie-field="note"]').evaluate((el) => getComputedStyle(el).whiteSpace)) === 'normal',
+    'no hidden breaks to reveal, so nothing should change'
+);
+
 check('the label does not change', (await toggle.textContent()) === 'Edit page');
 check('nor does it say it is pressed only in colour', (await toggle.getAttribute('aria-pressed')) === 'true');
 check(

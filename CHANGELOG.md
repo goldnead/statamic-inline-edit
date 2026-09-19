@@ -23,7 +23,7 @@ Edit `text`, `textarea` and `integer` fields on the live page. Mark a field with
 Refused on purpose, with a message rather than silently: the slug, collections with revisions
 enabled, any fieldtype not on the list, and any handle the page never offered.
 
-Tested with 19 PHP tests for the tag and the save route, and 52 browser checks against the
+Tested with 20 PHP tests for the tag and the save route, and 55 browser checks against the
 shipped script.
 
 ### What a round of review changed
@@ -47,6 +47,11 @@ only the pictures. Three passes:
   invitation and moved the button under the cursor. One label now, state on a dot, the colour
   and `aria-pressed`.
 - **Save and Discard sat there disabled** with editing off. They are absent instead.
+- **The page re-wrapped when edit mode came on.** Multiline fields got `white-space: pre-wrap`
+  with the toggle, so paragraphs moved under the person who had just clicked. The server now
+  flags only the fields whose stored value really contains a line break, and the style is on
+  the element from the first paint. A textarea holding one paragraph renders exactly as a
+  visitor sees it; nothing moves when the toggle is pressed.
 
 One bug worth naming because it was found before release and would have been hard to see
 afterwards: switching edit mode on gives multiline fields `white-space: pre-wrap`, which makes
