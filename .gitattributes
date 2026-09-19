@@ -12,6 +12,8 @@
 /phpstan.neon       export-ignore
 /pint.json          export-ignore
 /addon-lint.json    export-ignore
+/resources/js       export-ignore
+/scripts            export-ignore
 
 # The browser test harness. /tests is already ignored above; these two are what
 # would otherwise make every installing site download playwright.

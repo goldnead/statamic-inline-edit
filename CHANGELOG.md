@@ -1,5 +1,43 @@
 # Changelog
 
+## 1.2.0
+
+### Markdown is edited in place now, not in a box
+
+The popup with the monospace source is gone by default. The text on the page becomes the
+editor: same heading, same measure, same font, now with a cursor in it. Type `## ` and it
+becomes a heading, `- ` a list, `**bold**` bold as you close the asterisks. Select a few words
+and a small toolbar appears over them.
+
+It is [Tiptap](https://tiptap.dev), which is what Statamic's own Bard is built on, so the
+shortcuts are the ones clients already meet in the control panel. Fetched the first time
+somebody opens such a field, 180 KB over the wire, and never on a page nobody is editing. The
+file every editor's page does load stays at 11 KB.
+
+**The trade, stated plainly.** A rich editor reads markdown into a document and writes it back
+out, and markdown has more than one spelling for the same document. Editing one sentence
+rewrites the whole field in the editor's dialect. Opening a field and closing it without typing
+never writes anything, because the comparison is against what the editor produced on mount
+rather than against what was stored. `rich => false` gives the old source editor back, for
+markdown that has to survive byte for byte.
+
+This is the addon's first build step. One file, esbuild, committed, and a CI job that rebuilds
+it and fails on a diff.
+
+### The bar waits to be asked
+
+It used to sit at the bottom of every page an editor opened, whether they were editing or
+reading. Now there is one small button in the corner, and `Ctrl/Cmd + Shift + E` does the same
+thing from the keyboard. Pressing it brings up the bar and switches editing on; the bar has a
+close button that puts both away again.
+
+One bug found while wiring it: the handler that lets Space open a focused field was swallowing
+every space typed into the rich editor, because Tiptap mounts its contenteditable as a *child*
+of the marker. Typing `## ` produced `##`, so the markdown shortcut that is the whole point
+never fired.
+
+35 PHP tests, 102 browser checks.
+
 ## 1.1.0
 
 ### Three more kinds of field

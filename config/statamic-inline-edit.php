@@ -78,21 +78,46 @@ return [
     | Source fieldtypes
     |--------------------------------------------------------------------------
     |
-    | Fields that render as HTML but are stored as text. Double-clicking one
-    | swaps the rendered output for its own source, which is then edited as
-    | plain text with a small toolbar.
-    |
-    | Editing the source rather than the rendered HTML is the whole point.
-    | A contenteditable over rendered markdown has to be converted back on
-    | save, and every such conversion loses something: the exact list marker,
-    | a reference link, a footnote, an HTML block someone put there on
-    | purpose. The source round-trips byte for byte.
+    | Fields that render as HTML but are stored as text. How one of these
+    | opens depends on `rich` below: as a real editor in place, or as its own
+    | markdown source in a monospace box.
     |
     */
 
     'source' => [
         'markdown',
     ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Rich editing for source fields
+    |--------------------------------------------------------------------------
+    |
+    | With this on, a markdown field is edited where it sits: the text on the
+    | page becomes the editor, markdown shortcuts work as you type them
+    | (`## `, `- `, `**bold**`), and selecting text raises a small toolbar.
+    | It is Tiptap, the same editor Statamic's own Bard is built on, fetched
+    | the first time somebody opens such a field and never on a page nobody
+    | is editing.
+    |
+    | Off gives you the plain source editor instead: the markdown itself in a
+    | monospace box.
+    |
+    | The difference that matters is not the look. A rich editor reads the
+    | markdown into a document and writes it back out, and markdown has more
+    | than one spelling for the same document: `*a*` may return as `_a_`, a
+    | reference link as an inline one. Editing one sentence therefore
+    | rewrites the whole field in the editor's own dialect. If you have
+    | markdown you need back byte for byte, hand-written tables, HTML blocks,
+    | footnotes, switch this off.
+    |
+    | Either way, opening a field and closing it without typing never writes:
+    | the comparison is against what the editor produced on mount, not
+    | against what was stored.
+    |
+    */
+
+    'rich' => true,
 
     /*
     |--------------------------------------------------------------------------

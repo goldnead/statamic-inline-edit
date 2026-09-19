@@ -46,10 +46,59 @@
 }
 
 .sie-bar,
-.sie-bar * {
+.sie-bar *,
+.sie-launch,
+.sie-bubble,
+.sie-bubble * {
     all: unset;
     box-sizing: border-box;
     font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+/* The way in. One button, in the corner, out of the way.
+ *
+ * The bar used to be on every page an editor opened, whether they were
+ * editing or reading. That is a strip of somebody's site spent on a tool
+ * that is idle most of the time. */
+.sie-launch {
+    position: fixed;
+    z-index: 2147483000;
+    inset-block-end: max(16px, env(safe-area-inset-bottom));
+    inset-inline-end: 16px;
+
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 44px;
+    padding: 0 16px;
+
+    border-radius: 999px;
+    background: #16181d;
+    color: #f4f5f7;
+    box-shadow: 0 6px 20px rgb(0 0 0 / 28%), 0 0 0 1px rgb(255 255 255 / 10%) inset;
+
+    font-size: 13px;
+    font-weight: 500;
+    line-height: 1.4;
+    white-space: nowrap;
+    cursor: pointer;
+}
+
+.sie-launch[hidden] { display: none; }
+.sie-launch:hover { background: #22252c; }
+
+.sie-launch:focus-visible {
+    outline: 2px solid #60a5fa;
+    outline-offset: 3px;
+}
+
+.sie-launch::before {
+    content: "";
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #3b82f6;
 }
 
 .sie-bar {
@@ -156,12 +205,29 @@
     background: #2b6fe0;
 }
 
-/* Editing off: one button, nothing else. There is nothing to save and nothing
-   to discard, and two dead buttons on a client's live page look like something
-   that broke rather than something that is waiting. */
-.sie-bar.sie-idle .sie-save,
-.sie-bar.sie-idle .sie-discard {
-    display: none;
+.sie-bar[hidden] { display: none; }
+
+.sie-bar .sie-brand {
+    font-weight: 500;
+    white-space: nowrap;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.sie-bar .sie-brand::before {
+    content: "";
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #3b82f6;
+}
+
+.sie-bar .sie-close {
+    padding: 0 14px;
+    font-size: 18px;
+    line-height: 1;
 }
 
 /* The elastic middle. Everything else keeps its natural width, so the buttons
@@ -557,6 +623,80 @@
     white-space: pre-wrap;
     resize: vertical;
     overflow: auto;
+}
+
+/* ------------------------------------------------ the rich editor ------ */
+
+/* The page element IS the editor while this is on, so it deliberately gets
+   almost no styling of its own: the heading stays the site's heading, the
+   paragraph the site's paragraph. That is the whole point of editing in
+   place rather than in a box. */
+.sie-rich-host {
+    outline: 2px solid #3b82f6 !important;
+    outline-offset: 6px;
+    border-radius: 2px;
+}
+
+.sie-rich:focus,
+.sie-rich:focus-visible {
+    outline: none;
+}
+
+/* ProseMirror puts a paragraph inside every list item, and the site's own
+   `p { margin }` then pushes the items apart. The list would grow the moment
+   it is opened and shrink again on close, which is the page moving under the
+   person editing it. */
+.sie-rich li > p {
+    margin-block: 0;
+}
+
+/* ProseMirror's own placeholder for an empty document. */
+.sie-rich p.is-editor-empty:first-child::before {
+    content: attr(data-placeholder);
+    float: left;
+    height: 0;
+    pointer-events: none;
+    opacity: 0.45;
+}
+
+/* The toolbar that appears over a selection. Fixed, so nothing the host site
+   sets on an ancestor can clip it. */
+.sie-bubble {
+    position: fixed;
+    z-index: 2147483003;
+    display: flex;
+    gap: 2px;
+    padding: 4px;
+    border-radius: 8px;
+    background: #16181d;
+    box-shadow: 0 8px 26px rgb(0 0 0 / 38%), 0 0 0 1px rgb(255 255 255 / 10%) inset;
+}
+
+.sie-bubble[hidden] { display: none; }
+
+.sie-bubble .sie-bubble-btn {
+    display: inline-flex;
+    align-items: center;
+    padding: 0 9px;
+    min-height: 30px;
+    border-radius: 5px;
+    color: #f4f5f7;
+    font-size: 12px;
+    font-weight: 500;
+    white-space: nowrap;
+    cursor: pointer;
+}
+
+.sie-bubble .sie-bubble-btn:hover { background: rgb(255 255 255 / 14%); }
+
+.sie-bubble .sie-bubble-on {
+    background: #3b82f6;
+    color: #fff;
+}
+
+.sie-bubble .sie-bubble-btn:focus-visible {
+    outline: 2px solid #60a5fa;
+    outline-offset: 1px;
 }
 
 /* -------------------------------------------- the control panel overlay */

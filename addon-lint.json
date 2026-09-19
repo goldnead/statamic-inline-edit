@@ -1,17 +1,28 @@
 {
   "_why": [
-    "ui.statamic-cms-package reads a package.json as meaning a Control Panel Vite build, and asks",
-    "for @statamic/cms in devDependencies so the UI kit is pinned to the Statamic version in vendor/.",
+    "Three UI rules fire here, and all three assume a Control Panel addon. This one has no Control",
+    "Panel surface at all: no CP page, no fieldtype, no widget, no nav item. Everything it ships runs",
+    "on the public frontend of a site, which is the case none of these rules was written for.",
     "",
-    "This addon has no Control Panel surface at all. It renders one frontend tag, ships a hand-written",
-    "stylesheet and script with no build step, and imports nothing from @statamic/cms/ui. The",
-    "package.json exists for exactly one dependency: playwright-core, which drives tests/browser/run.mjs",
-    "for the behaviour that only exists in a browser — double-click to edit, the dirty count, Escape",
-    "reverting, the shape of the save request, and the bar surviving a hostile host stylesheet. Adding",
-    "the dependency would pull in a UI kit nothing imports.",
+    "ui.statamic-cms-package expects a package.json to mean a CP Vite build, and asks for @statamic/cms",
+    "in devDependencies so the UI kit is pinned to the Statamic version in vendor/. Nothing here imports",
+    "from @statamic/cms/ui, and adding the dependency would pull in a UI kit nothing uses. The",
+    "package.json exists for esbuild, Tiptap and playwright-core.",
     "",
-    "Revisit this the day the addon grows a real CP screen — then the rule is right and this entry is",
-    "wrong.",
+    "ui.vite-config wants a vite.config.js because resources/js exists. There is no CP bundle to build.",
+    "The one bundled file, resources/dist/inline-edit-rich.js, is built by scripts/build-rich.mjs with",
+    "esbuild into a plain IIFE that a <script> tag on a client's page can load, which is not something",
+    "Statamic's Vite setup produces. The build is committed and CI rebuilds it and fails on a diff, so",
+    "the guarantee the rule is really after — the shipped bundle matches its source — is kept, just not",
+    "by Vite.",
+    "",
+    "ui.no-dom-piercing flags document.body.appendChild in rich.js. That rule protects a Vue component",
+    "tree in the CP. The element in question is the toolbar that appears over a text selection on a",
+    "client's own page, and it has to be a direct child of body and position: fixed: anywhere else, the",
+    "first ancestor with overflow: hidden clips it, and on a real client site that ancestor exists.",
+    "",
+    "Revisit all three the day this addon grows a real CP screen. Then the rules are right and these",
+    "entries are wrong.",
     "",
     "release.editions is an INFO, not a rule, and it asks a question rather than reporting a fault:",
     "\"Confirm this is a single-edition commercial addon.\" Confirmed on 2026-09-19 — one product, no",
@@ -19,6 +30,8 @@
     "declared edition without a feature behind it cannot gate anything."
   ],
   "disable": [
-    "ui.statamic-cms-package"
+    "ui.statamic-cms-package",
+    "ui.vite-config",
+    "ui.no-dom-piercing"
   ]
 }

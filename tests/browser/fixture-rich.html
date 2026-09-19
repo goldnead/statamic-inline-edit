@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<title>Inline Edit rich fixture</title>
+
+<!--
+  The rich path on its own page.
+
+  fixture.html keeps `rich: false`, so it goes on proving the plain source
+  editor still works as the fallback. This one switches it on and does
+  nothing else, so a failure here names the editor rather than the page.
+-->
+
+<link rel="stylesheet" href="../../resources/dist/inline-edit.css">
+
+<style>
+    body { font-family: Georgia, serif; max-width: 42rem; margin: 0 auto; padding: 3rem 1.5rem 8rem; line-height: 1.6; }
+    h2 { font-size: 1.6rem; margin: 0 0 .5rem; }
+</style>
+</head>
+<body>
+
+<article>
+<div data-sie-id="entry-1" data-sie-field="body" data-sie-type="markdown" data-sie-mode="source"
+     data-sie-reload="true" data-sie-label="Text" data-sie-stamp="1700000000"><h2>Ein Kapitel</h2>
+<p>Mit einem <strong>Absatz</strong>.</p></div>
+<script type="application/json" class="sie-source">"## Ein Kapitel\n\nMit einem **Absatz**."</script>
+</article>
+
+<script id="statamic-inline-edit-config" type="application/json">
+{
+  "saveUrl": "https://fixture.test/!/statamic-inline-edit/save",
+  "previewUrl": "https://fixture.test/!/statamic-inline-edit/preview",
+  "rich": true,
+  "richUrl": "../../resources/dist/inline-edit-rich.js",
+  "csrf": "test-csrf-token",
+  "maxLength": 100000,
+  "labels": {
+    "edit": "Edit page",
+    "editing": "Editing",
+    "save": "Save",
+    "discard": "Discard",
+    "close": "Close",
+    "unsaved": ":count unsaved",
+    "hint": "Tap or double-click any highlighted text.",
+    "bold": "Bold",
+    "italic": "Italic",
+    "list": "List",
+    "link": "Link",
+    "quote": "Quote",
+    "badge_source": "Markdown"
+  }
+}
+</script>
+<script src="../../resources/dist/inline-edit.js"></script>
+
+</body>
+</html>

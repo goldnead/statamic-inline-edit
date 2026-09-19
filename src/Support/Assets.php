@@ -41,6 +41,8 @@ class Assets
         $data = [
             'saveUrl' => $this->actionUrl('save'),
             'previewUrl' => $this->actionUrl('preview'),
+            'rich' => (bool) config('statamic-inline-edit.rich', true),
+            'richUrl' => $this->url('inline-edit-rich.js'),
             'csrf' => csrf_token(),
             'maxLength' => app(Editor::class)->maxLength(),
             'labels' => [
@@ -67,6 +69,9 @@ class Assets
                 'heading' => __('statamic-inline-edit::messages.heading'),
                 'list' => __('statamic-inline-edit::messages.list'),
                 'link' => __('statamic-inline-edit::messages.link'),
+                'quote' => __('statamic-inline-edit::messages.quote'),
+                'link_prompt' => __('statamic-inline-edit::messages.link_prompt'),
+                'shortcut' => __('statamic-inline-edit::messages.shortcut'),
                 'badge_text' => __('statamic-inline-edit::messages.badge_text'),
                 'badge_control' => __('statamic-inline-edit::messages.badge_control'),
                 'badge_source' => __('statamic-inline-edit::messages.badge_source'),

@@ -63,7 +63,8 @@ console.log('signed in: ' + markers + ' markers, X-Statamic-Uncacheable: ' + cac
 
 await shot('2-editor-idle');
 
-await page.locator('.sie-toggle').click();
+await shot('3a-launcher');
+await page.locator('.sie-launch').click();
 await shot('3-editing-on');
 
 await page.locator('[data-sie-field="title"]').dblclick();
@@ -94,8 +95,8 @@ await page.reload({ waitUntil: 'domcontentloaded' });
 // here would switch it off and photograph the wrong state. Wait for it to
 // restore itself instead, and only click if it did not.
 await page.waitForSelector('.sie-bar');
-if (!(await page.locator('.sie-toggle').evaluate((el) => el.classList.contains('sie-on')))) {
-    await page.locator('.sie-toggle').click();
+if (await page.locator('.sie-launch').isVisible()) {
+    await page.locator('.sie-launch').click();
 }
 await shot('6-phone');
 
@@ -117,8 +118,8 @@ await page.keyboard.press('Escape');
 await page.setViewportSize({ width: 1280, height: 900 });
 await page.reload({ waitUntil: 'domcontentloaded' });
 await page.waitForSelector('.sie-bar');
-if (!(await page.locator('.sie-toggle').evaluate((el) => el.classList.contains('sie-on')))) {
-    await page.locator('.sie-toggle').click();
+if (await page.locator('.sie-launch').isVisible()) {
+    await page.locator('.sie-launch').click();
 }
 
 await page.locator('[data-sie-field="promoted"]').dblclick();
@@ -130,8 +131,17 @@ await shot('9-select');
 await page.keyboard.press('Escape');
 
 await page.locator('[data-sie-field="body"]').dblclick();
-await shot('10-markdown-source');
+await page.waitForSelector('.sie-rich', { timeout: 20000 });
+await page.waitForTimeout(400);
+await shot('10-rich-editor');
+
+// Selecting a word raises the toolbar over it.
+await page.locator('.sie-rich p').first().dblclick({ position: { x: 30, y: 12 } });
+await page.waitForTimeout(400);
+console.log('bubble = ' + (await page.locator('.sie-bubble').isVisible()));
+await shot('10b-bubble-toolbar');
 await page.keyboard.press('Escape');
+await page.waitForTimeout(600);
 
 await page.locator('[data-sie-field="schlagworte"]').dblclick();
 // Inside the window in which the opened field is still outlined.
@@ -146,11 +156,12 @@ await page.waitForTimeout(1500);
 await page.setViewportSize({ width: 390, height: 844 });
 await page.goto(BASE + '/inline-edit', { waitUntil: 'domcontentloaded' });
 await page.waitForSelector('.sie-bar');
-if (!(await page.locator('.sie-toggle').evaluate((el) => el.classList.contains('sie-on')))) {
-    await page.locator('.sie-toggle').click();
+if (await page.locator('.sie-launch').isVisible()) {
+    await page.locator('.sie-launch').click();
 }
 
 await page.locator('[data-sie-field="body"]').dispatchEvent('pointerup', { pointerType: 'touch', bubbles: true });
+await page.waitForSelector('.sie-rich', { timeout: 20000 });
 await page.waitForTimeout(500);
 await shot('12-phone-markdown');
 await page.keyboard.press('Escape');

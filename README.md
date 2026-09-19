@@ -22,18 +22,22 @@ the login, finding the entry, finding the field, and hoping nothing else got tou
 | Statamic Pro | not required. Collections with revisions enabled are refused, and revisions are Pro |
 | JavaScript | required in the editor's browser. Visitors need none |
 
-No build step, no Node, no Vite. The addon ships its stylesheet and script as plain files.
+Installing needs no Node and no build. Two of the three shipped files are hand-written; the
+third, the rich editor, is bundled here and committed, and CI fails if it drifts from its
+source.
 
 ---
 
 ## What it looks like
 
-A signed-in editor gets one button docked at the bottom of the window. They switch editing on,
-every marked field picks up a dashed outline, and a double-click opens whatever that field
-needs: a cursor in a headline, a switch on a toggle, its own markdown source, or the control
-panel over the page. Everyone else sees the page exactly as before: same HTML, no wrapper
-elements, no script, no attributes. There is nothing to leak because for a visitor nothing is
-rendered.
+A signed-in editor gets one small button in the corner. Press it, or `Ctrl/Cmd + Shift + E`,
+and a bar docks at the bottom: every marked field picks up a dashed outline, and a double-click
+opens whatever that field needs. A cursor in a headline. A switch on a toggle. A real editor in
+the text itself for markdown, with a toolbar that appears over the selection. The control panel
+over the page for everything else. Close the bar and the page is a page again.
+
+Everyone else sees exactly what they saw before: same HTML, no wrapper elements, no script, no
+attributes. There is nothing to leak because for a visitor nothing is rendered.
 
 ## Install
 
@@ -88,7 +92,7 @@ fieldtype, in `config/statamic-inline-edit.php`.
 |---|---|---|
 | **text** | `text`, `textarea`, `integer` | The text itself opens. What you type is what the page will show. |
 | **control** | `toggle`, `select`, `date` | A small control opens. The value is not the text on the page, so there is nothing to put a cursor in. |
-| **source** | `markdown` | The rendered output is swapped for its own markdown source, with a small toolbar. |
+| **source** | `markdown` | The text becomes a real editor, in place. Markdown shortcuts as you type, a toolbar over the selection. |
 | **cp** | everything else | That entry's control panel form opens in an overlay. |
 
 Only **text** keeps what you typed on the page as you typed it. The other three reload the page
@@ -109,10 +113,23 @@ after saving, because only the server knows what the template will make of the n
 A select's choices come from your blueprint, and the save route checks the arriving value
 against them again. The dropdown in the browser is a suggestion; the request is what happened.
 
-**source** edits the markdown, not a rendered copy of it. A contenteditable over rendered HTML
-has to be converted back on every save, and every such conversion loses something: the exact
-list marker, a reference link, a footnote, an HTML block someone put there deliberately. The
-source round-trips byte for byte. The toolbar writes the same syntax you would type.
+**source** turns the text on the page into the editor. Not a box over it, not a copy of it: the
+same heading, the same measure, the same font, now with a cursor in it. Type `## ` and it
+becomes a heading, `- ` a list, `**bold**` bold as you close the asterisks. Select a few words
+and a small toolbar appears over them.
+
+It is [Tiptap](https://tiptap.dev), which is also what Statamic's own Bard is built on, so the
+shortcuts and the behaviour are the ones your clients already meet in the control panel. It is
+fetched the first time somebody opens such a field, 180 KB, and never on a page nobody is
+editing.
+
+**What it costs.** A rich editor reads markdown into a document and writes it back out, and
+markdown has more than one spelling for the same document: `*a*` may return as `_a_`, a
+reference link as an inline one. Editing one sentence rewrites the whole field in the editor's
+dialect. Opening a field and closing it without typing never writes anything, because the
+comparison is against what the editor produced on mount rather than against what was stored.
+But if you have markdown that has to come back byte for byte, hand-written tables, HTML blocks,
+footnotes, set `rich` to `false` and you get the plain source editor instead.
 
 **cp** is the real control panel in an iframe, not a rebuilt editor. Bard alone is an entire
 editor and an asset picker is an entire browser; a second-rate copy of either is worse than one
@@ -188,7 +205,8 @@ php artisan vendor:publish --tag=statamic-inline-edit-config
 | `enabled` | `true` | Off means the tag renders the plain value, no script is injected, and the save route answers 404. |
 | `fieldtypes` | `text`, `textarea`, `integer` | Edited in place. Every one of them has to store a plain string; see above. |
 | `controls` | `toggle`, `select`, `date` | Edited through a small control. |
-| `source` | `markdown` | Edited as its own source. |
+| `source` | `markdown` | Edited in place with a real editor. |
+| `rich` | `true` | The editor for those. `false` gives the plain markdown source in a monospace box instead. |
 | `control_panel` | `true` | Everything else opens the control panel in an overlay. Off means those fields are simply not clickable. |
 | `multiline` | `textarea` | Of the text ones, where Enter inserts a line break instead of leaving the field. |
 | `inject` | `true` | Places the editor before `</body>` automatically. Switch off and use `{{ inline_edit:assets }}` if a Content Security Policy needs the script somewhere specific. |
@@ -246,6 +264,7 @@ one toggle again.
 
 | | |
 |---|---|
+| Ctrl/Cmd + Shift + E | show and hide the bar |
 | Double-click, or a single tap on a touch screen | start editing |
 | Enter / Space on a focused field | start editing, without a mouse |
 | Escape | discard this field |
@@ -259,13 +278,18 @@ earlier. Reading the page is never interrupted.
 
 ```bash
 composer install
-vendor/bin/phpunit          # 35 tests: the tag and the save route
+vendor/bin/phpunit          # 35 tests: the tag, the save route and the preview route
 vendor/bin/pint --test
 vendor/bin/phpstan analyse
 
 npm install
-node tests/browser/run.mjs  # 86 checks: everything that only exists in a browser
+npm run build               # resources/js/rich.js -> resources/dist/inline-edit-rich.js
+node tests/browser/run.mjs  # 102 checks: everything that only exists in a browser
 ```
+
+`resources/dist/inline-edit-rich.js` is committed, because a site that installs this addon gets
+no build step. The `bundle` job in CI rebuilds it and fails on a diff, so the file in the
+repository is always the file the source produces. `npm run watch` rebuilds while you work.
 
 The two suites answer different questions and neither covers the other. PHP proves the
 server: who may write, to which field, with what validation, and what happens when two people

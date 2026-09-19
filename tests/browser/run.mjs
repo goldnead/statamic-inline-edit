@@ -16,6 +16,7 @@ import { dirname, resolve } from 'node:path';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const PAGE = 'file://' + resolve(here, 'fixture.html');
+const PAGE_RICH = 'file://' + resolve(here, 'fixture-rich.html');
 const EXECUTABLE = process.env.CHROME_PATH || '/usr/bin/google-chrome';
 
 const shotIndex = process.argv.indexOf('--shot');
@@ -60,7 +61,7 @@ await context.route('**/statamic-inline-edit/save', async (route) => {
 await page.goto(PAGE);
 
 const bar = page.locator('.sie-bar');
-const toggle = page.locator('.sie-toggle');
+const launcher = page.locator('.sie-launch');
 const save = page.locator('.sie-save');
 const discard = page.locator('.sie-discard');
 const count = page.locator('.sie-count');
@@ -70,39 +71,47 @@ const intro = page.locator('[data-sie-field="intro"]');
 const second = page.locator('[data-sie-field="title"]');
 const empty = page.locator('[data-sie-field="subtitle"]');
 
-console.log('\nthe bar');
+console.log('\nthe way in')
 
-check('appears', await bar.isVisible());
-check('starts with editing off', (await toggle.textContent()) === 'Edit page');
+check('is one small button in the corner, not a bar', (await launcher.isVisible()) && (await bar.isHidden()));
+check('and it says what it does', (await launcher.textContent()) === 'Edit page');
+check('with the shortcut in its tooltip', (await launcher.getAttribute('title')).includes('Ctrl+Shift+E'));
+check('its target is big enough for a thumb', (await launcher.boundingBox()).height >= 44);
 check(
-    'shows only the toggle while editing is off',
-    !(await save.isVisible()) && !(await discard.isVisible()),
-    'dead buttons on a live page read as something broken'
+    'and the host stylesheet has not got at it',
+    (await launcher.evaluate((el) => getComputedStyle(el).backgroundColor)) !== 'rgb(255, 105, 180)',
+    'the fixture sets button { background: hotpink }'
 );
+
+console.log('\nediting off');
+
+check('no field is outlined', (await title.evaluate((el) => getComputedStyle(el).outlineStyle)) === 'none');
+check('nothing is contenteditable', (await page.locator('[contenteditable]').count()) === 0);
+
+// The layout an editor reads must be the layout a visitor reads, and it must
+// not jump when edit mode comes on. Measured across the switch, because this
+// used to break exactly there: pre-wrap arrived with edit mode and re-wrapped
+// every multiline paragraph under the person who clicked.
+const beforeToggle = await page.evaluate(() =>
+    Array.from(document.querySelectorAll('[data-sie-field]')).map((n) => Math.round(n.getBoundingClientRect().height))
+);
+
+console.log('\nediting on');
+
+await launcher.click();
 
 const barBox = await bar.boundingBox();
 const viewport = page.viewportSize();
 
+check('the bar takes the buttons place', (await bar.isVisible()) && (await launcher.isHidden()));
 check(
-    'is docked across the full width',
+    'docked across the full width',
     Math.abs(barBox.width - viewport.width) < 2 && Math.abs(barBox.y + barBox.height - viewport.height) < 2,
     'box ' + JSON.stringify(barBox)
 );
-check(
-    'keeps its own colours',
-    (await toggle.evaluate((el) => getComputedStyle(el).backgroundColor)) !== 'rgb(255, 105, 180)',
-    'hotpink leaked in from the host stylesheet'
-);
-check(
-    'its buttons keep their own size',
-    (await toggle.boundingBox()).width < 240,
-    'the page sets a hostile global button rule'
-);
-check(
-    'its buttons are big enough for a thumb',
-    (await toggle.boundingBox()).height >= 44,
-    Math.round((await toggle.boundingBox()).height) + 'px'
-);
+check('its buttons keep their own size', (await save.boundingBox()).width < 240, 'the page sets a hostile global button rule');
+check('and are big enough for a thumb', (await save.boundingBox()).height >= 44);
+check('there is a way back out', await page.locator('.sie-close').isVisible());
 
 // The bar is fixed, so without a spacer it lies on top of whatever the page
 // put at the bottom. The last paragraph must still be reachable.
@@ -110,43 +119,14 @@ check(
     'it reserves its own space at the end of the document',
     Math.abs((await page.locator('.sie-spacer').boundingBox()).height - barBox.height) < 2
 );
-
-console.log('\nediting off');
-
 check(
-    'no field is outlined',
-    (await title.evaluate((el) => getComputedStyle(el).outlineStyle)) === 'none'
-);
-check('nothing is contenteditable', (await page.locator('[contenteditable]').count()) === 0);
-
-check(
-    'it publishes its height for other bottom-pinned overlays',
+    'and publishes its height for other bottom-pinned overlays',
     (await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--sie-bar-height').trim())) ===
         Math.round(barBox.height) + 'px'
 );
 
-// The layout an editor reads must be the layout a visitor reads, and it must
-// not jump when the toggle is pressed. Measured across the switch, because
-// this used to break exactly there: pre-wrap arrived with edit mode and
-// re-wrapped every multiline paragraph under the person who clicked.
-const beforeToggle = await page.evaluate(() =>
-    Array.from(document.querySelectorAll('[data-sie-field]')).map((n) => Math.round(n.getBoundingClientRect().height))
-);
-
-console.log('\nediting on');
-
-const toggleWidthBefore = (await toggle.boundingBox()).width;
-
-await toggle.click();
-
-// Measured now rather than before the click: with editing off the button is
-// not on the page at all.
 let savePosition = Math.round((await save.boundingBox()).x);
 
-// One label in both states: it must not read like an invitation while it is
-// already running, and the button must not change width under the pointer
-// that is about to click it again.
-const toggleWidthOff = Math.round(toggleWidthBefore);
 const afterToggle = await page.evaluate(() =>
     Array.from(document.querySelectorAll('[data-sie-field]')).map((n) => Math.round(n.getBoundingClientRect().height))
 );
@@ -165,32 +145,9 @@ check(
     'no hidden breaks to reveal, so nothing should change'
 );
 
-check('the label does not change', (await toggle.textContent()) === 'Edit page');
-check('nor does it say it is pressed only in colour', (await toggle.getAttribute('aria-pressed')) === 'true');
-check(
-    'and the button has not changed width',
-    Math.abs(Math.round((await toggle.boundingBox()).width) - toggleWidthOff) < 2,
-    'was ' + toggleWidthOff + ', now ' + Math.round((await toggle.boundingBox()).width)
-);
-
-// The on state has to be readable at a glance and instantly, not after a
-// fade. Green is deliberately not used here: in Statamic green means "that
-// worked", and it is kept for the saved message.
-const toggleBg = await toggle.evaluate((el) => getComputedStyle(el).backgroundColor);
-// Read with the pointer still on the button, because that is where it is
-// the moment after someone clicks it.
-check(
-    'the on state is unmistakable, hover or not',
-    toggleBg === 'rgb(59, 130, 246)' || toggleBg === 'rgb(43, 111, 224)',
-    'got ' + toggleBg
-);
-check(
-    'and it does not fade into it',
-    (await toggle.evaluate((el) => getComputedStyle(el).transitionProperty)) === 'none',
-    'a fade means there is a moment where the bar says neither on nor off'
-);
 const saveBg = await save.evaluate((el) => getComputedStyle(el).backgroundColor);
 check('the primary action is not green', !saveBg.startsWith('rgb(62, 207'), 'got ' + saveBg);
+
 check(
     'editable fields are outlined',
     (await title.evaluate((el) => getComputedStyle(el).outlineStyle)) === 'dashed'
@@ -261,8 +218,8 @@ check(
     'Save ends at ' + Math.round(saveBox.x + saveBox.width) + ', label "' + (await save.textContent()) + '"'
 );
 check(
-    'and the toggle is still reachable',
-    (await toggle.boundingBox()).x >= 0 && (await toggle.boundingBox()).height >= 44
+    'and the close button is still reachable',
+    (await page.locator('.sie-close').boundingBox()).height >= 44
 );
 
 // The middle is a few dozen pixels wide here, so the count moves onto the
@@ -538,14 +495,114 @@ const frame = page.locator('.sie-frame');
 await page.waitForTimeout(600);
 await page.goto(PAGE);
 await page.waitForSelector('.sie-bar');
-if (!(await page.locator('.sie-toggle').evaluate((el) => el.classList.contains('sie-on')))) {
-    await page.locator('.sie-toggle').click();
+// Edit mode survives a reload through sessionStorage; the launcher is only
+// there when it did not.
+if (await page.locator('.sie-launch').isVisible()) {
+    await page.locator('.sie-launch').click();
 }
 
 await page.locator('[data-sie-field="hero"]').dblclick();
 check('a field only the control panel can edit opens it over the page', await page.locator('.sie-panel').isVisible());
 check('in an iframe pointed at the entry', (await frame.getAttribute('src')) === 'about:blank');
 check('with a way out', await page.locator('.sie-panel-close').isVisible());
+
+/* --------------------------------------------------- the rich editor ---- */
+
+console.log('\nthe rich editor');
+
+let previewAsked = null;
+await context.route('**/statamic-inline-edit/preview', async (route) => {
+    previewAsked = JSON.parse(route.request().postData() || '{}');
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ html: '<h2>Vom Server</h2>' }) });
+});
+
+await page.goto(PAGE_RICH);
+await page.waitForSelector('.sie-launch', { state: 'attached' });
+
+// Edit mode survives the navigation through sessionStorage, so the launcher
+// may already be out of the way.
+if (await page.locator('.sie-launch').isVisible()) {
+    await page.locator('.sie-launch').click();
+}
+
+const body = page.locator('[data-sie-field="body"]');
+await body.dblclick();
+await page.waitForSelector('.sie-rich', { timeout: 15000 });
+
+check('the page element itself becomes the editor', await body.evaluate((el) => el.classList.contains('sie-rich-host')));
+check('not a box over it', (await page.locator('.sie-pop').count()) === 0 || (await page.locator('.sie-pop').isHidden()));
+check(
+    'and it keeps the page typography',
+    (await page.locator('.sie-rich h2').evaluate((el) => getComputedStyle(el).fontFamily)).toLowerCase().includes('georgia'),
+    'the whole point of editing in place is that it looks like the page'
+);
+
+// Nothing was typed, so nothing may be pending. Round-tripping markdown
+// normalises it, and a normalisation nobody asked for is not a change.
+check('opening it is not a change', (await save.isDisabled()), 'a mount must never mark the page dirty');
+
+console.log('\nmarkdown shortcuts');
+
+await page.locator('.sie-rich').click();
+await page.keyboard.press('ControlOrMeta+End');
+await page.keyboard.press('Enter');
+await page.keyboard.type('### Neue Ueberschrift');
+check('typing ### makes a heading', (await page.locator('.sie-rich h3').count()) === 1);
+
+await page.keyboard.press('Enter');
+await page.keyboard.type('- eins');
+check('typing - makes a list', (await page.locator('.sie-rich ul li').count()) >= 1);
+
+await page.keyboard.press('Enter');
+await page.keyboard.press('Enter');
+await page.keyboard.type('Das ist **fett** getippt.');
+check('typing ** makes it bold as you go', (await page.locator('.sie-rich strong').count()) >= 2);
+
+check('and all of that counts as one change', (await count.textContent()) === '1 unsaved');
+
+// ProseMirror wraps every list item in a paragraph, and the site's own
+// paragraph margin then pushes the items apart: the list grows the moment it
+// is opened and shrinks again on close.
+check(
+    'a list does not grow just because it is being edited',
+    (await page.locator('.sie-rich li > p').first().evaluate((el) => getComputedStyle(el).marginBlockStart)) === '0px'
+);
+
+console.log('\nthe bubble toolbar');
+
+// Near the left edge, on the word. A locator's default click lands in the
+// middle of the element, and a heading is full width, so the middle is empty
+// space past the end of the text: the selection then sits on a node boundary
+// and nothing is selected at all.
+await page.locator('.sie-rich h3').first().dblclick({ position: { x: 14, y: 12 } });
+await page.waitForTimeout(250);
+const bubble = page.locator('.sie-bubble');
+check('selecting text raises it', await bubble.isVisible());
+check(
+    'over the selection, not in a corner',
+    (await bubble.boundingBox()).y < (await page.locator('.sie-rich h3').first().boundingBox()).y + 10
+);
+const tools = await page.locator('.sie-bubble-btn').allTextContents();
+check('with the usual suspects', JSON.stringify(tools) === '["Bold","Italic","H2","H3","List","Quote","Link"]', JSON.stringify(tools));
+check('and it says what the selection already is', (await page.locator('.sie-bubble-on').count()) >= 1);
+
+await page.locator('.sie-bubble-btn', { hasText: 'Bold' }).click();
+await page.waitForTimeout(150);
+check('pressing one changes the text', (await page.locator('.sie-rich h3 strong').count()) === 1);
+
+console.log('\nclosing it');
+
+await page.locator('body').click({ position: { x: 5, y: 5 } });
+await page.waitForFunction(() => document.querySelector('[data-sie-field="body"]').innerText.includes('Vom Server'), { timeout: 5000 }).catch(() => {});
+
+check('the editor goes away', (await page.locator('.sie-rich').count()) === 0);
+check('the server is asked what it will look like', previewAsked !== null);
+check(
+    'and it sends markdown, not HTML',
+    previewAsked && previewAsked.value.includes('### **Neue** Ueberschrift') && !previewAsked.value.includes('<h3'),
+    previewAsked ? JSON.stringify(previewAsked.value.slice(0, 80)) : 'nothing sent'
+);
+check('which is what lands on the page', (await body.innerText()).includes('Vom Server'));
 
 await browser.close();
 

@@ -1,15 +1,17 @@
 /*!
  * Statamic Inline Edit
  *
- * Hand-written, on purpose. The whole editor is a bar, a contenteditable and a
- * fetch; a build step would add a toolchain to a file that a client site loads
- * on every page an editor opens, and buy nothing. Keep it that way.
+ * Hand-written, on purpose, and it stays that way. This is the file every
+ * page an editor opens has to load, 11 KB over the wire, and a toolchain
+ * would buy it nothing. The one bundled file in this addon,
+ * inline-edit-rich.js, is fetched on demand and only by somebody who has
+ * actually opened a markdown field.
  *
- * The safety rule this file exists to hold: what goes back to the server is
- * always innerText, never innerHTML. A browser's contenteditable will happily
- * produce <font>, style attributes and pasted markup, and none of it can reach
- * the content if we never read it. That is why version 1 only ever offers
- * plain-string fields.
+ * The safety rule this file holds: what goes back to the server is never
+ * innerHTML. A text field sends innerText, a control sends a scalar picked
+ * from a real control, a markdown field sends markdown. A browser's
+ * contenteditable will happily produce <font>, style attributes and pasted
+ * markup, and none of it can reach the content if we never read it.
  */
 (function () {
     'use strict';
@@ -139,17 +141,35 @@
 
     /* ----------------------------------------------------------------- bar */
 
+    /**
+     * The way in: one small button in the corner.
+     *
+     * The bar used to sit at the bottom of every page an editor opened,
+     * whether they were editing or reading. It is a strip of somebody's site
+     * spent on a tool that is idle most of the time. Now the strip only
+     * exists while it is being used, and the rest of the time there is a
+     * button the size of a favicon.
+     */
+    var launcher = document.createElement('button');
+    launcher.type = 'button';
+    launcher.className = 'sie-launch';
+    launcher.textContent = L.edit || 'Edit page';
+    launcher.title = (L.edit || 'Edit page') + ' (' + (L.shortcut || 'Ctrl+Shift+E') + ')';
+
     var bar = document.createElement('div');
     bar.className = 'sie-bar';
     bar.setAttribute('role', 'toolbar');
+    bar.hidden = true;
     bar.innerHTML =
-        '<button type="button" class="sie-btn sie-toggle"></button>' +
+        '<span class="sie-brand"></span>' +
         '<span class="sie-count"></span>' +
         '<span class="sie-status"></span>' +
         '<button type="button" class="sie-btn sie-discard"></button>' +
-        '<button type="button" class="sie-btn sie-primary sie-save"></button>';
+        '<button type="button" class="sie-btn sie-primary sie-save"></button>' +
+        '<button type="button" class="sie-btn sie-close" aria-label=""></button>';
 
-    var toggleBtn = bar.querySelector('.sie-toggle');
+    var brandEl = bar.querySelector('.sie-brand');
+    var closeBtn = bar.querySelector('.sie-close');
     var countEl = bar.querySelector('.sie-count');
     var statusEl = bar.querySelector('.sie-status');
     var discardBtn = bar.querySelector('.sie-discard');
@@ -157,20 +177,15 @@
 
     discardBtn.textContent = L.discard || 'Discard';
     saveBtn.textContent = L.save || 'Save';
+    closeBtn.textContent = '×';
+    closeBtn.setAttribute('aria-label', L.close || 'Close');
+    brandEl.textContent = L.editing || 'Editing';
 
     function paint() {
         var count = dirty().length;
 
-        // One label in both states, on purpose. It used to say "Editing" while
-        // on, which reads like an invitation to start rather than a statement
-        // that it is running, and it made the button change width, so the
-        // click that switches editing off landed somewhere other than the
-        // click that switched it on. The dot and the colour carry the state,
-        // and `aria-pressed` carries it for anyone not looking at colour.
-        toggleBtn.textContent = L.edit || 'Edit page';
-        toggleBtn.title = editing ? (L.editing || 'Editing') : '';
-        toggleBtn.setAttribute('aria-pressed', editing ? 'true' : 'false');
-        toggleBtn.classList.toggle('sie-on', editing);
+        bar.hidden = !editing;
+        launcher.hidden = editing;
 
         countEl.textContent = editing
             ? (count ? counted(count) : (L.hint || ''))
@@ -181,11 +196,6 @@
         countEl.classList.toggle('sie-hint', editing && count === 0);
 
         bar.classList.toggle('sie-has-changes', count > 0);
-
-        // With editing off there is nothing that could ever be saved, so Save
-        // and Discard are not disabled, they are absent. A row of dead buttons
-        // on somebody's live page reads as a broken widget.
-        bar.classList.toggle('sie-idle', !editing);
         saveBtn.disabled = busy || count === 0;
         discardBtn.disabled = busy || count === 0;
 
@@ -215,7 +225,7 @@
     function setEditing(on) {
         editing = on;
 
-        if (!on) closePop();
+        if (!on) { closePop(); closeAllRich(); }
 
         try {
             on ? sessionStorage.setItem(STORAGE_KEY, '1') : sessionStorage.removeItem(STORAGE_KEY);
@@ -468,7 +478,102 @@
      * The source round-trips byte for byte, and the toolbar writes the same
      * syntax the person would type.
      */
+    /* ------------------------------------------------- the rich editor ---- */
+
+    var richHosts = new Map();
+    var richHtml = new WeakMap();
+    var richLoading = null;
+
+    /**
+     * Fetched the first time somebody opens a markdown field, and never on a
+     * page nobody is editing.
+     *
+     * It is 180 KB over the wire, which is what a real editor costs and which
+     * no visitor and no reading editor ever pays.
+     */
+    function loadRich() {
+        if (window.SIERich) return Promise.resolve(true);
+        if (richLoading) return richLoading;
+
+        richLoading = new Promise(function (resolve) {
+            var script = document.createElement('script');
+            script.src = config.richUrl;
+            script.onload = function () { resolve(!!window.SIERich); };
+            script.onerror = function () { resolve(false); };
+            document.head.appendChild(script);
+        });
+
+        return richLoading;
+    }
+
+    /**
+     * Markdown, edited where it sits.
+     *
+     * The element on the page becomes the editor: same typography, same
+     * width, same everything, so what is being typed is the page rather than
+     * a picture of it. Markdown shortcuts work as they are typed, and
+     * selecting text raises a small toolbar over it.
+     */
+    function openRich(node) {
+        if (richHosts.has(node)) return;
+
+        loadRich().then(function (ok) {
+            if (!ok) return openSourcePopup(node);
+            if (richHosts.has(node) || !editing) return;
+
+            if (!richHtml.has(node)) richHtml.set(node, node.innerHTML);
+
+            node.classList.add('sie-rich-host');
+            node.innerHTML = '';
+
+            richHosts.set(node, window.SIERich.mount(node, {
+                markdown: pending.has(node) ? pending.get(node) : sourceOf(node),
+                labels: L,
+                onChange: function (markdown, changed) {
+                    changed ? setPending(node, markdown) : clearPending(node);
+                },
+            }));
+        });
+    }
+
+    /**
+     * Close it and put the page back.
+     *
+     * Two endings, and the difference matters. Untouched: the original
+     * rendering goes back, byte for byte, because nothing happened. Changed:
+     * the server is asked what the new markdown renders to, and that goes on
+     * the page. Leaving the editor's own HTML there would look right and be a
+     * different renderer's opinion of the same text.
+     */
+    function closeRich(node) {
+        var instance = richHosts.get(node);
+
+        if (!instance) return;
+
+        instance.destroy();
+        richHosts.delete(node);
+        node.classList.remove('sie-rich-host');
+
+        if (pending.has(node)) {
+            preview(node);
+        } else if (richHtml.has(node)) {
+            node.innerHTML = richHtml.get(node);
+        }
+    }
+
+    function closeAllRich() {
+        Array.from(richHosts.keys()).forEach(closeRich);
+    }
+
     function openSource(node) {
+        // The plain source editor is still one config line away, for anyone
+        // who needs markdown to come back out exactly as it went in.
+        if (config.rich !== false && config.richUrl) return openRich(node);
+
+        return openSourcePopup(node);
+    }
+
+    function openSourcePopup(node) {
         popFor = node;
         pop.innerHTML = '';
         pop.className = 'sie-pop sie-pop-wide';
@@ -755,6 +860,15 @@
         });
 
         node.addEventListener('keydown', function (event) {
+            // Hands off entirely once the rich editor owns this element.
+            //
+            // Tiptap mounts a contenteditable *child*, so the marker itself
+            // reports `isContentEditable === false` and the branch below
+            // would treat every Space as "open this field" and swallow it.
+            // Typing "## " then produced "##", and the markdown shortcut that
+            // is the whole point of the rich editor never fired.
+            if (richHosts.has(node)) return;
+
             if (!node.isContentEditable) {
                 // Keyboard equivalent of the double-click, so the editor is
                 // reachable without a mouse.
@@ -910,16 +1024,28 @@
 
     /* --------------------------------------------------------------- wiring */
 
-    toggleBtn.addEventListener('click', function () {
+    function toggleMode() {
         if (editing && dirty().length && !window.confirm(L.leave || 'You have unsaved changes on this page.')) return;
         if (editing) discard();
         setEditing(!editing);
-    });
+    }
+
+    launcher.addEventListener('click', toggleMode);
+    closeBtn.addEventListener('click', toggleMode);
 
     saveBtn.addEventListener('click', save);
     discardBtn.addEventListener('click', discard);
 
     document.addEventListener('keydown', function (event) {
+        // Ctrl/Cmd + Shift + E opens and closes the whole thing, so the bar
+        // never has to sit on the page waiting to be needed.
+        if ((event.metaKey || event.ctrlKey) && event.shiftKey && (event.key === 'E' || event.key === 'e')) {
+            event.preventDefault();
+            toggleMode();
+
+            return;
+        }
+
         if (!editing) return;
         if (!(event.metaKey || event.ctrlKey) || event.key !== 's') return;
         event.preventDefault();
@@ -932,6 +1058,7 @@
         event.returnValue = '';
     });
 
+    document.body.appendChild(launcher);
     document.body.appendChild(bar);
     document.body.appendChild(pop);
     document.body.appendChild(panel);
@@ -941,7 +1068,7 @@
     // is never a way to lose a choice.
     document.addEventListener('mousedown', function (event) {
         if (pop.hidden) return;
-        if (pop.contains(event.target) || bar.contains(event.target)) return;
+        if (pop.contains(event.target) || bar.contains(event.target) || launcher.contains(event.target)) return;
         if (popFor && popFor.contains(event.target)) return;
         closePop();
     });
@@ -949,7 +1076,20 @@
     document.addEventListener('keydown', function (event) {
         if (event.key !== 'Escape') return;
         if (!panel.hidden) { closePanel(); return; }
-        if (!pop.hidden) closePop();
+        if (!pop.hidden) { closePop(); return; }
+        closeAllRich();
+    });
+
+    // A click outside every open rich editor closes it, the same way the
+    // popover closes. Inside one, the click is a cursor.
+    document.addEventListener('mousedown', function (event) {
+        if (!richHosts.size) return;
+        if (bar.contains(event.target) || launcher.contains(event.target)) return;
+        if (event.target.closest && event.target.closest('.sie-bubble')) return;
+
+        Array.from(richHosts.keys()).forEach(function (node) {
+            if (!node.contains(event.target)) closeRich(node);
+        });
     });
 
     // Give the bar its own space at the end of the document instead of letting

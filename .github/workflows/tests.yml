@@ -63,6 +63,28 @@ jobs:
       # branch rewrites their work without asking.
       - run: vendor/bin/pint --test
 
+  bundle:
+    runs-on: ubuntu-latest
+    name: Built bundle is current
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - run: npm install --no-audit --no-fund
+
+      - run: npm run build
+
+      # resources/dist/inline-edit-rich.js is committed, because a site that
+      # installs this addon gets no build step. This is what keeps the
+      # committed file honest: if it does not match what the source produces,
+      # the job fails rather than shipping a bundle nobody can reproduce.
+      - name: Fail if the committed bundle is stale
+        run: git diff --exit-code -- resources/dist/inline-edit-rich.js
+
   browser:
     runs-on: ubuntu-latest
     name: Browser behaviour
@@ -109,6 +131,7 @@ jobs:
       - name: Run addon-lint
         run: php studio/tools/addon-lint/bin/addon-lint addon --no-color --fail-on=major -v
 
-# There is no assets job on purpose. resources/dist is hand-written vanilla
-# JavaScript and CSS with no build step, so there is no generated artefact that
-# could drift from a source. See the header of resources/dist/inline-edit.js.
+# Two of the three files in resources/dist are hand-written and have no
+# source to drift from: inline-edit.js and inline-edit.css. The third,
+# inline-edit-rich.js, is built from resources/js/rich.js, and the bundle job
+# above is what keeps it in step.
