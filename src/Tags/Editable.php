@@ -3,6 +3,7 @@
 namespace Goldnead\StatamicInlineEdit\Tags;
 
 use Goldnead\StatamicInlineEdit\Support\Editor;
+use Illuminate\Support\Facades\Route;
 use Statamic\Fields\Value;
 use Statamic\Tags\Tags;
 
@@ -61,17 +62,27 @@ class Editable extends Tags
 
         $value = $this->context->get($field);
 
-        $text = $this->stringify($value instanceof Value ? $value->value() : $value);
+        // The pair form hands the visible output to the template:
+        //
+        //     {{ editable field="promoted" }}{{ if promoted }}ja{{ /if }}{{ /editable }}
+        //
+        // Needed for everything whose value is not the text on the page. A
+        // toggle renders as a word the template chose, an image as an <img>,
+        // a Bard as a whole section, and none of those can be produced from
+        // the value by a tag that does not know the design.
+        $inner = $this->isPair ? (string) $this->parse() : null;
 
-        $marker = $this->marker($field, $value, $text);
+        $text = $inner ?? $this->stringify($value instanceof Value ? $value->value() : $value);
 
-        if ($marker === null) {
+        [$attributes, $trailer] = $this->marker($field, $value, $text, $inner !== null);
+
+        if ($attributes === null) {
             return $text;
         }
 
         $tag = $this->tagName();
 
-        return '<'.$tag.' '.$marker.'>'.$text.'</'.$tag.'>';
+        return '<'.$tag.' '.$attributes.'>'.$text.'</'.$tag.'>'.$trailer;
     }
 
     /**
@@ -82,16 +93,20 @@ class Editable extends Tags
      * is not a real field, the field is nested somewhere we cannot address,
      * the fieldtype is not one we can safely put a cursor in.
      */
-    protected function marker(string $field, mixed $value, string $text): ?string
+    /**
+     * @return array{0: ?string, 1: string} the attributes, and any markup that
+     *                                      has to sit next to the element
+     */
+    protected function marker(string $field, mixed $value, string $text, bool $isPair): array
     {
         $editor = app(Editor::class);
 
         if (! $editor->enabled() || ! $editor->user()) {
-            return null;
+            return [null, ''];
         }
 
         if (! $value instanceof Value) {
-            return null;
+            return [null, ''];
         }
 
         // Null inside a Bard or Replicator set, where core builds the value
@@ -100,13 +115,23 @@ class Editable extends Tags
         $entry = $value->augmentable();
 
         if (! $editor->canEdit($entry)) {
-            return null;
+            return [null, ''];
         }
 
         $type = $this->fieldtype($value);
+        $mode = $editor->modeFor($type);
 
-        if (! $editor->isEditableFieldtype($type)) {
-            return null;
+        if ($mode === null) {
+            return [null, ''];
+        }
+
+        // A text field's value IS the text on the page, and that is the only
+        // reason it can be edited in place. Wrapped in a pair, the template
+        // may have put markup, a second field or a separator inside, and the
+        // browser's innerText would then be saved over the value. Refused
+        // rather than guessed at.
+        if ($mode === 'text' && $isPair) {
+            return [null, ''];
         }
 
         $editor->markRendered();
@@ -115,8 +140,46 @@ class Editable extends Tags
             'data-sie-id' => (string) $entry->id(),
             'data-sie-field' => $value->handle() ?: $field,
             'data-sie-type' => $type,
+            'data-sie-mode' => $mode,
             'data-sie-stamp' => $this->stamp($entry),
         ];
+
+        // Modes where what gets typed is not what the page will show. A
+        // toggle renders through the template's own `if`, markdown through a
+        // renderer, a Bard through the whole section partial. Only a reload
+        // shows the truth, and pretending otherwise leaves the editor looking
+        // at their input instead of their page.
+        if ($mode !== 'text') {
+            $attributes['data-sie-reload'] = 'true';
+        }
+
+        $trailer = '';
+
+        if ($mode === 'control') {
+            $attributes['data-sie-raw'] = $this->scalar($value->raw());
+
+            if ($type === 'select' && ($options = $this->options($value)) !== null) {
+                $attributes['data-sie-options'] = $options;
+            }
+        }
+
+        if ($mode === 'source') {
+            // In a script block rather than an attribute: this is the whole
+            // body of a markdown field, and an attribute carrying a few
+            // kilobytes of escaped newlines is unreadable in the source and
+            // easy to break with one stray quote.
+            $trailer = '<script type="application/json" class="sie-source">'
+                .$this->json($this->scalar($value->raw()))
+                .'</script>';
+        }
+
+        // The whole URL, built here rather than assembled in the browser. The
+        // control panel lives wherever `statamic.cp.route` says, which a
+        // script on the frontend has no way of knowing, and a guessed `/cp`
+        // would send half the installations to a 404.
+        if ($mode === 'cp' && ($url = $this->panelUrl($entry))) {
+            $attributes['data-sie-cp'] = $url;
+        }
 
         // The field's own label from the blueprint, for the placeholder an
         // empty field shows. "Add subtitle" tells the person which of three
@@ -125,7 +188,7 @@ class Editable extends Tags
             $attributes['data-sie-label'] = $label;
         }
 
-        if ($editor->isMultiline($type)) {
+        if ($mode === 'text' && $editor->isMultiline($type)) {
             $attributes['data-sie-multiline'] = 'true';
 
             // Only when the stored value really has line breaks in it.
@@ -144,9 +207,103 @@ class Editable extends Tags
             }
         }
 
-        return collect($attributes)
+        $rendered = collect($attributes)
             ->map(fn (string $v, string $k): string => $k.'="'.e($v).'"')
             ->implode(' ');
+
+        return [$rendered, $trailer];
+    }
+
+    /**
+     * Where this entry is edited in the control panel.
+     *
+     * Null rather than fatal when the route is not registered, which is the
+     * case in a package test that boots the provider without core's own
+     * control panel routes. A missing overlay costs a click; an exception
+     * costs the page.
+     */
+    protected function panelUrl(mixed $entry): ?string
+    {
+        if (! is_object($entry) || ! method_exists($entry, 'collectionHandle')) {
+            return null;
+        }
+
+        if (! Route::has('statamic.cp.collections.entries.edit')) {
+            return null;
+        }
+
+        return route('statamic.cp.collections.entries.edit', [
+            'collection' => $entry->collectionHandle(),
+            'entry' => $entry->id(),
+        ]);
+    }
+
+    /**
+     * The configured choices of a select, as JSON for the browser.
+     *
+     * Null when the field does not offer a fixed set, which is the case for
+     * a select with `taggable` on: there is nothing to put in a dropdown, and
+     * offering an empty one would be worse than leaving the field alone.
+     */
+    protected function options(Value $value): ?string
+    {
+        $field = $value->field();
+
+        if (! $field || ! method_exists($field, 'get')) {
+            return null;
+        }
+
+        $options = $field->get('options');
+
+        if (! is_array($options) || $options === []) {
+            return null;
+        }
+
+        // Statamic accepts both shapes: a map of value to label, and a plain
+        // list where the value is its own label.
+        $normalised = [];
+
+        foreach ($options as $key => $label) {
+            $normalised[] = [
+                'value' => (string) (is_int($key) ? $label : $key),
+                'label' => (string) ($label === null ? $key : $label),
+            ];
+        }
+
+        return $this->json($normalised);
+    }
+
+    /**
+     * A stored value flattened to the string the browser will send back.
+     *
+     * A toggle arrives as a real boolean and must not become "1" or "" by
+     * accident, because the control has to show the right state before
+     * anybody touches it.
+     */
+    protected function scalar(mixed $raw): string
+    {
+        if (is_bool($raw)) {
+            return $raw ? 'true' : 'false';
+        }
+
+        if (is_string($raw) || is_int($raw) || is_float($raw)) {
+            return (string) $raw;
+        }
+
+        return '';
+    }
+
+    /**
+     * Strict flags, always. This lands inside an attribute or a script block
+     * on a page, and a value a client typed into the control panel must not
+     * be able to close either of them.
+     */
+    protected function json(mixed $data): string
+    {
+        return (string) json_encode(
+            $data,
+            JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT
+        );
     }
 
     /**

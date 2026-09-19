@@ -111,4 +111,31 @@ await shot('7-phone-editing');
 
 await page.keyboard.press('Escape');
 
+// The three ways version 2 added, on the desktop. Opened and photographed,
+// never saved: a save of any of them reloads the page on purpose, and this
+// script must not leave the demo carrying a test edit.
+await page.setViewportSize({ width: 1280, height: 900 });
+await page.reload({ waitUntil: 'domcontentloaded' });
+await page.waitForSelector('.sie-bar');
+if (!(await page.locator('.sie-toggle').evaluate((el) => el.classList.contains('sie-on')))) {
+    await page.locator('.sie-toggle').click();
+}
+
+await page.locator('[data-sie-field="promoted"]').dblclick();
+await shot('8-toggle');
+await page.keyboard.press('Escape');
+
+await page.locator('[data-sie-field="belegung"]').dblclick();
+await shot('9-select');
+await page.keyboard.press('Escape');
+
+await page.locator('[data-sie-field="body"]').dblclick();
+await shot('10-markdown-source');
+await page.keyboard.press('Escape');
+
+await page.locator('[data-sie-field="schlagworte"]').dblclick();
+await page.waitForTimeout(2500);
+console.log('cp overlay open = ' + (await page.locator('.sie-panel').isVisible()));
+await shot('11-control-panel');
+
 await browser.close();

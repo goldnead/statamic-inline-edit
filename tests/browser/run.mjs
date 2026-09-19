@@ -379,6 +379,99 @@ await discard.click();
 check('the page is back to the saved text', (await title.innerText()) === 'Zuerst die Technik');
 check('and nothing is pending', await save.isDisabled());
 
+/* ------------------------------------------------ the version 2 modes ---- */
+
+const toggle2 = page.locator('[data-sie-field="promoted"]');
+const select2 = page.locator('[data-sie-field="belegung"]');
+const body2 = page.locator('[data-sie-field="body"]');
+const hero = page.locator('[data-sie-field="hero"]');
+const popover = page.locator('.sie-pop');
+
+console.log('\na toggle');
+
+await toggle2.dblclick();
+check('opens a control rather than a cursor', await popover.isVisible());
+check('and the field itself never becomes editable', !(await toggle2.evaluate((el) => el.isContentEditable)));
+check('the switch shows the stored state', (await page.locator('.sie-switch').getAttribute('aria-pressed')) === 'true');
+
+await page.locator('.sie-switch').click();
+check('flipping it counts as a change', (await count.textContent()) === '1 unsaved');
+check(
+    'and the page text is left alone',
+    (await toggle2.innerText()) === 'ja',
+    'the template decides what a toggle reads as, so only a reload can show it'
+);
+
+await page.locator('.sie-pop-done').click();
+check('the control closes', await popover.isHidden());
+check('and the change survives closing it', (await count.textContent()) === '1 unsaved');
+
+console.log('\na select');
+
+await select2.dblclick();
+const choices = await page.locator('.sie-pop select option').allTextContents();
+check('offers the blueprint choices plus a way to clear', JSON.stringify(choices) === '["—","Offen","Ausgebucht"]', JSON.stringify(choices));
+check('with the stored one selected', (await page.locator('.sie-pop select').inputValue()) === 'offen');
+
+await page.locator('.sie-pop select').selectOption('voll');
+check('picking another counts', (await count.textContent()) === '2 unsaved');
+await page.keyboard.press('Escape');
+
+console.log('\nmarkdown');
+
+await body2.dblclick();
+const source = await page.locator('.sie-area').inputValue();
+check(
+    'opens its own source, not the rendered HTML',
+    source === '## Ein Kapitel\n\nMit einem **Absatz**.',
+    JSON.stringify(source)
+);
+
+await page.locator('.sie-area').evaluate((el) => el.setSelectionRange(3, 14));
+await page.locator('.sie-tool[title="Bold"]').click();
+check(
+    'the toolbar writes markdown around the selection',
+    (await page.locator('.sie-area').inputValue()).startsWith('## **Ein Kapitel**'),
+    JSON.stringify(await page.locator('.sie-area').inputValue())
+);
+
+await page.keyboard.press('Escape');
+check('three changes are now pending', (await count.textContent()) === '3 unsaved');
+
+console.log('\nsaving the three of them');
+
+reply = { status: 200, body: { saved: [{ id: 'entry-1', stamp: '1700010000' }] } };
+lastRequest = null;
+
+// No status to wait for here: these three fields all reload the page on a
+// successful save, so the bar is gone by the time the request has landed.
+// The request itself is what this section is about.
+await save.click();
+await page.waitForFunction(() => true);
+await page.waitForTimeout(600);
+
+const sent = lastRequest.body.changes.find((c) => c.id === 'entry-1').fields;
+
+check('a toggle travels as a real boolean', sent.promoted === false, JSON.stringify(sent.promoted));
+check('a select travels as the chosen key', sent.belegung === 'voll', JSON.stringify(sent.belegung));
+check('markdown travels as its source', sent.body.startsWith('## **Ein Kapitel**'), JSON.stringify(sent.body));
+
+console.log('\nthe control panel overlay');
+
+// Last, because closing it reloads the page on purpose.
+const frame = page.locator('.sie-frame');
+await page.waitForTimeout(600);
+await page.goto(PAGE);
+await page.waitForSelector('.sie-bar');
+if (!(await page.locator('.sie-toggle').evaluate((el) => el.classList.contains('sie-on')))) {
+    await page.locator('.sie-toggle').click();
+}
+
+await page.locator('[data-sie-field="hero"]').dblclick();
+check('a field only the control panel can edit opens it over the page', await page.locator('.sie-panel').isVisible());
+check('in an iframe pointed at the entry', (await frame.getAttribute('src')) === 'about:blank');
+check('with a way out', await page.locator('.sie-panel-close').isVisible());
+
 await browser.close();
 
 console.log('');

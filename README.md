@@ -1,6 +1,6 @@
 # Statamic Inline Edit
 
-Edit text straight on the live page. Double-click, type, save.
+Edit content straight on the live page. Double-click, change it, save.
 
 Not a page builder. You cannot move a block, add a section or change a layout with it, and that
 is on purpose. It exists for the change a client actually asks for: one wrong word in a
@@ -17,7 +17,8 @@ the login, finding the entry, finding the field, and hoping nothing else got tou
 | PHP | 8.2 or newer |
 | Laravel | 12.40 or newer, or 13 (whatever Statamic 6 pulls in) |
 | Content | Entries. Globals, taxonomy terms and users are not supported yet |
-| Fieldtypes | `text`, `textarea`, `integer` |
+| Control panel | Must be framable from the site's own origin for the overlay. Switch `control_panel` off if it is not |
+| Fieldtypes | `text`, `textarea`, `integer` in place; `toggle`, `select`, `date` and `markdown` through a control; the rest through the control panel |
 | Statamic Pro | not required. Collections with revisions enabled are refused, and revisions are Pro |
 | JavaScript | required in the editor's browser. Visitors need none |
 
@@ -28,9 +29,11 @@ No build step, no Node, no Vite. The addon ships its stylesheet and script as pl
 ## What it looks like
 
 A signed-in editor gets one button docked at the bottom of the window. They switch editing on,
-the editable text picks up a dashed outline, they double-click a headline, type, and press
-Save. Everyone else sees the page exactly as before: same HTML, no wrapper elements, no script,
-no attributes. There is nothing to leak because for a visitor nothing is rendered.
+every marked field picks up a dashed outline, and a double-click opens whatever that field
+needs: a cursor in a headline, a switch on a toggle, its own markdown source, or the control
+panel over the page. Everyone else sees the page exactly as before: same HTML, no wrapper
+elements, no script, no attributes. There is nothing to leak because for a visitor nothing is
+rendered.
 
 ## Install
 
@@ -78,16 +81,43 @@ same reason.
 
 ## What can be edited
 
-| | |
-|---|---|
-| `text`, `textarea`, `integer` | yes |
-| everything else | renders normally, is not clickable |
+Four kinds of field, four different things happen. Which one a field gets is decided by its
+fieldtype, in `config/statamic-inline-edit.php`.
 
-The list lives in `config/statamic-inline-edit.php` and is deliberately short. What travels back
-to the server is always the browser's `innerText`, never `innerHTML`, so no markup a
-contenteditable produces can reach your content. That safety model only holds while every
-fieldtype on the list stores a plain string. **Adding `markdown` or `bard` does not give you a
-rich editor, it gives you a field whose formatting the next save flattens.**
+| | Fieldtypes | Double-clicking it |
+|---|---|---|
+| **text** | `text`, `textarea`, `integer` | The text itself opens. What you type is what the page will show. |
+| **control** | `toggle`, `select`, `date` | A small control opens. The value is not the text on the page, so there is nothing to put a cursor in. |
+| **source** | `markdown` | The rendered output is swapped for its own markdown source, with a small toolbar. |
+| **cp** | everything else | That entry's control panel form opens in an overlay. |
+
+Only **text** keeps what you typed on the page as you typed it. The other three reload the page
+after saving, because only the server knows what the template will make of the new value.
+
+### Why each one is the way it is
+
+**text** is the original: what travels back to the server is the browser's `innerText`, never
+`innerHTML`, so no markup a contenteditable produces can reach your content.
+
+**control** needs the pair form, because the tag cannot produce the visible output itself:
+
+```antlers
+{{ editable field="promoted" }}{{ if promoted }}Läuft{{ else }}Pausiert{{ /if }}{{ /editable }}
+{{ editable field="starts_on" }}{{ starts_on format="d.m.Y" }}{{ /editable }}
+```
+
+A select's choices come from your blueprint, and the save route checks the arriving value
+against them again. The dropdown in the browser is a suggestion; the request is what happened.
+
+**source** edits the markdown, not a rendered copy of it. A contenteditable over rendered HTML
+has to be converted back on every save, and every such conversion loses something: the exact
+list marker, a reference link, a footnote, an HTML block someone put there deliberately. The
+source round-trips byte for byte. The toolbar writes the same syntax you would type.
+
+**cp** is the real control panel in an iframe, not a rebuilt editor. Bard alone is an entire
+editor and an asset picker is an entire browser; a second-rate copy of either is worse than one
+click into the real one. Saving there goes through the control panel's own validation,
+revisions and permissions.
 
 The slug is refused outright and cannot be enabled. Changing it moves the page out from under
 the person editing it and breaks every link to it.
@@ -144,8 +174,11 @@ php artisan vendor:publish --tag=statamic-inline-edit-config
 | Key | Default | |
 |---|---|---|
 | `enabled` | `true` | Off means the tag renders the plain value, no script is injected, and the save route answers 404. |
-| `fieldtypes` | `text`, `textarea`, `integer` | See above before extending it. |
-| `multiline` | `textarea` | Of those, the ones where Enter inserts a line break instead of leaving the field. |
+| `fieldtypes` | `text`, `textarea`, `integer` | Edited in place. Every one of them has to store a plain string; see above. |
+| `controls` | `toggle`, `select`, `date` | Edited through a small control. |
+| `source` | `markdown` | Edited as its own source. |
+| `control_panel` | `true` | Everything else opens the control panel in an overlay. Off means those fields are simply not clickable. |
+| `multiline` | `textarea` | Of the text ones, where Enter inserts a line break instead of leaving the field. |
 | `inject` | `true` | Places the editor before `</body>` automatically. Switch off and use `{{ inline_edit:assets }}` if a Content Security Policy needs the script somewhere specific. |
 | `max_length` | `100000` | A ceiling on any one field, independent of the blueprint. |
 
@@ -153,12 +186,13 @@ php artisan vendor:publish --tag=statamic-inline-edit-config
 
 Named, not hidden:
 
-- **Bard, Replicator and Grid.** No inline editing. Core builds those values without a link
-  back to their entry, so the text is genuinely unaddressable from the page.
-- **Markdown** with a formatting toolbar.
-- **Images.** Swapping an asset from the page.
-- **Revisions.** A collection with revisions enabled refuses the save and says so, rather than
-  writing straight past a workflow whose whole point is that somebody approves first.
+- **Bard and Replicator, inline.** Core builds the values inside a set without a link back to
+  their entry, so a paragraph in a Bard is genuinely unaddressable from the page. Marking the
+  whole field opens the control panel instead, which is the honest answer.
+- **Revisions.** A collection with revisions enabled refuses the save on the page and says so,
+  rather than writing straight past a workflow whose whole point is that somebody approves
+  first. Its fields are still reachable through the control panel overlay, where revisions work
+  as they should.
 - **Globals, taxonomy terms and users.** Entries only. All three reach a template as augmented
   values too, but each needs its own way of being found again on save, and rendering a marker
   we cannot save is worse than rendering none.
@@ -209,12 +243,12 @@ earlier. Reading the page is never interrupted.
 
 ```bash
 composer install
-vendor/bin/phpunit          # 18 tests: the tag and the save route
+vendor/bin/phpunit          # 30 tests: the tag and the save route
 vendor/bin/pint --test
 vendor/bin/phpstan analyse
 
 npm install
-node tests/browser/run.mjs  # 55 checks: everything that only exists in a browser
+node tests/browser/run.mjs  # 74 checks: everything that only exists in a browser
 ```
 
 The two suites answer different questions and neither covers the other. PHP proves the

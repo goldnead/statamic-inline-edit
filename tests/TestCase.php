@@ -50,6 +50,12 @@ abstract class TestCase extends AddonTestCase
             'title' => ['type' => 'text', 'display' => 'Überschrift'],
             'intro' => ['type' => 'textarea'],
             'promoted' => ['type' => 'toggle'],
+            // Not called `status`: an entry already has a computed `status`
+            // of its own, and it wins in the cascade. A blueprint field with
+            // that handle is simply never reachable from a template.
+            'belegung' => ['type' => 'select', 'options' => ['offen' => 'Offen', 'voll' => 'Ausgebucht']],
+            'starts_on' => ['type' => 'date'],
+            'body' => ['type' => 'markdown'],
             'hero' => ['type' => 'assets', 'max_files' => 1],
         ])->setHandle($handle)->setNamespace('collections.'.$handle);
 

@@ -53,6 +53,74 @@ class SaveControllerTest extends TestCase
     }
 
     #[Test]
+    public function it_saves_a_toggle_as_a_real_boolean(): void
+    {
+        $this->makeCollection();
+        $this->makeEntry(['title' => 'Old', 'promoted' => false]);
+
+        $this->actingAs($this->anEditor())
+            ->postJson($this->url, $this->change(['promoted' => true]))
+            ->assertOk();
+
+        $this->assertTrue(Entry::find('entry-1')->get('promoted'));
+    }
+
+    #[Test]
+    public function it_saves_a_choice_the_blueprint_offers(): void
+    {
+        $this->makeCollection();
+        $this->makeEntry(['title' => 'Old', 'belegung' => 'offen']);
+
+        $this->actingAs($this->anEditor())
+            ->postJson($this->url, $this->change(['belegung' => 'voll']))
+            ->assertOk();
+
+        $this->assertSame('voll', Entry::find('entry-1')->get('belegung'));
+    }
+
+    #[Test]
+    public function a_choice_the_blueprint_does_not_offer_is_refused(): void
+    {
+        $this->makeCollection();
+        $this->makeEntry(['title' => 'Old', 'belegung' => 'offen']);
+
+        // The dropdown in the browser is a suggestion. This is what arrived.
+        $this->actingAs($this->anEditor())
+            ->postJson($this->url, $this->change(['belegung' => 'erfunden']))
+            ->assertStatus(422);
+
+        $this->assertSame('offen', Entry::find('entry-1')->get('belegung'));
+    }
+
+    #[Test]
+    public function it_saves_markdown_source_byte_for_byte(): void
+    {
+        $this->makeCollection();
+        $this->makeEntry(['title' => 'Old', 'body' => '# Alt']);
+
+        $source = "# Neu\n\n- eins\n- zwei\n\nEin [Link](https://example.com) und `code`.";
+
+        $this->actingAs($this->anEditor())
+            ->postJson($this->url, $this->change(['body' => $source]))
+            ->assertOk();
+
+        $this->assertSame($source, Entry::find('entry-1')->get('body'));
+    }
+
+    #[Test]
+    public function a_field_that_only_the_control_panel_can_edit_is_refused(): void
+    {
+        $this->makeCollection();
+        $this->makeEntry(['title' => 'Old']);
+
+        // Those fields open the control panel, which does its own saving.
+        // This route must never become a way around that.
+        $this->actingAs($this->anEditor())
+            ->postJson($this->url, $this->change(['hero' => 'anything']))
+            ->assertStatus(422);
+    }
+
+    #[Test]
     public function a_guest_is_refused(): void
     {
         $this->makeCollection();

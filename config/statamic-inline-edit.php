@@ -51,6 +51,51 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Control fieldtypes
+    |--------------------------------------------------------------------------
+    |
+    | Fields whose value is not the text on the page. A toggle renders as
+    | "ja" or "in stock" or a coloured dot, depending on what the template
+    | makes of it, so there is nothing to put a cursor in. These open a small
+    | control instead, and the page reloads after saving so the template
+    | renders the new value its own way.
+    |
+    | They need the pair form, because the tag has to wrap whatever the
+    | template produced rather than produce it itself:
+    |
+    |     {{ editable field="promoted" }}{{ if promoted }}ja{{ else }}nein{{ /if }}{{ /editable }}
+    |
+    */
+
+    'controls' => [
+        'toggle',
+        'select',
+        'date',
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Source fieldtypes
+    |--------------------------------------------------------------------------
+    |
+    | Fields that render as HTML but are stored as text. Double-clicking one
+    | swaps the rendered output for its own source, which is then edited as
+    | plain text with a small toolbar.
+    |
+    | Editing the source rather than the rendered HTML is the whole point.
+    | A contenteditable over rendered markdown has to be converted back on
+    | save, and every such conversion loses something: the exact list marker,
+    | a reference link, a footnote, an HTML block someone put there on
+    | purpose. The source round-trips byte for byte.
+    |
+    */
+
+    'source' => [
+        'markdown',
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Multiline fieldtypes
     |--------------------------------------------------------------------------
     |
@@ -80,6 +125,29 @@ return [
     */
 
     'inject' => true,
+
+    /*
+    |--------------------------------------------------------------------------
+    | Fall back to the control panel
+    |--------------------------------------------------------------------------
+    |
+    | What to do with a marked field that none of the lists above covers: a
+    | Bard, a Replicator, an image, a Grid. With this on, double-clicking it
+    | opens that entry's control panel form in an overlay on the same page.
+    |
+    | Deliberately the real control panel in an iframe, not a rebuilt editor.
+    | Bard alone is a whole editor, an asset picker is a whole browser, and a
+    | second-rate copy of either is worse than one click into the real one.
+    | Saving there goes through the control panel's own validation, revisions
+    | and permissions, and the page reloads when the overlay closes.
+    |
+    | Switch it off if your control panel sits behind a proxy that refuses to
+    | be framed, or on another domain. Those fields then simply render
+    | normally and are not clickable.
+    |
+    */
+
+    'control_panel' => true,
 
     /*
     |--------------------------------------------------------------------------

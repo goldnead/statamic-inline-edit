@@ -56,6 +56,16 @@ class Assets
                 'conflict' => __('statamic-inline-edit::messages.conflict'),
                 'failed' => __('statamic-inline-edit::messages.failed'),
                 'leave' => __('statamic-inline-edit::messages.leave'),
+                'leave_panel' => __('statamic-inline-edit::messages.leave_panel'),
+                'done' => __('statamic-inline-edit::messages.done'),
+                'close' => __('statamic-inline-edit::messages.close'),
+                'on' => __('statamic-inline-edit::messages.on'),
+                'off' => __('statamic-inline-edit::messages.off'),
+                'bold' => __('statamic-inline-edit::messages.bold'),
+                'italic' => __('statamic-inline-edit::messages.italic'),
+                'heading' => __('statamic-inline-edit::messages.heading'),
+                'list' => __('statamic-inline-edit::messages.list'),
+                'link' => __('statamic-inline-edit::messages.link'),
             ],
         ];
 

@@ -294,6 +294,222 @@
     content: none;
 }
 
+/* A field whose new value is not on the page. The outline says "this will be
+   saved", because nothing else on screen can. */
+.sie-editing [data-sie-field].sie-changed {
+    outline: 2px solid #3b82f6;
+    background: rgb(59 130 246 / 14%);
+}
+
+/* Text is typed into; everything else is a trigger for something that opens
+   over the page. The cursor should say which. */
+.sie-editing [data-sie-field][data-sie-mode="control"],
+.sie-editing [data-sie-field][data-sie-mode="source"],
+.sie-editing [data-sie-field][data-sie-mode="cp"] {
+    cursor: pointer;
+
+    /* A double-click on text selects a word, and here the text is a button,
+       not something to select. Without this every open leaves a blue
+       highlight behind that looks like the field is half in some other mode. */
+    user-select: none;
+    -webkit-user-select: none;
+}
+
+/* ---------------------------------------------------------- the popover */
+
+/* Fixed, not absolute: on a real client page something up the tree has
+   `overflow: hidden` sooner or later, and an absolutely positioned popover
+   gets clipped by it with no warning. */
+.sie-pop,
+.sie-pop * {
+    all: unset;
+    box-sizing: border-box;
+    font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+.sie-pop {
+    position: fixed;
+    z-index: 2147483001;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    max-width: calc(100vw - 16px);
+    padding: 10px;
+    border-radius: 10px;
+    background: #16181d;
+    color: #f4f5f7;
+    box-shadow: 0 10px 34px rgb(0 0 0 / 38%), 0 0 0 1px rgb(255 255 255 / 10%) inset;
+    font-size: 13px;
+    line-height: 1.4;
+}
+
+.sie-pop[hidden] { display: none; }
+
+.sie-pop-wide {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 8px;
+    width: min(680px, calc(100vw - 16px));
+}
+
+.sie-pop-wide .sie-tools { grid-column: 1 / -1; }
+.sie-pop-wide .sie-area { grid-column: 1 / -1; }
+
+/* Its own row, at the end of it. Left in the first track it stretches across
+   the whole editor and reads like a second text field. */
+.sie-pop-wide .sie-pop-done {
+    grid-column: 1 / -1;
+    justify-self: end;
+}
+
+.sie-pop .sie-pop-label {
+    opacity: 0.65;
+    white-space: nowrap;
+}
+
+.sie-pop .sie-input {
+    min-height: 40px;
+    min-width: 10rem;
+    padding: 0 10px;
+    border-radius: 6px;
+    background: #f4f5f7;
+    color: #16181d;
+    font-size: 14px;
+    cursor: pointer;
+}
+
+.sie-pop .sie-switch {
+    min-height: 40px;
+    min-width: 5.5rem;
+    padding: 0 14px;
+    border-radius: 6px;
+    background: rgb(255 255 255 / 12%);
+    text-align: center;
+    cursor: pointer;
+    font-weight: 500;
+}
+
+.sie-pop .sie-switch[aria-pressed="true"] {
+    background: #3b82f6;
+    color: #fff;
+}
+
+.sie-pop .sie-pop-done {
+    min-height: 40px;
+    padding: 0 14px;
+    border-radius: 6px;
+    background: rgb(255 255 255 / 12%);
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+.sie-pop .sie-pop-done:hover { background: rgb(255 255 255 / 22%); }
+
+.sie-pop :focus-visible {
+    outline: 2px solid #60a5fa;
+    outline-offset: 2px;
+}
+
+/* ------------------------------------------------- the markdown source */
+
+.sie-pop .sie-tools {
+    display: flex;
+    gap: 6px;
+}
+
+.sie-pop .sie-tool {
+    min-width: 34px;
+    min-height: 34px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 5px;
+    background: rgb(255 255 255 / 10%);
+    cursor: pointer;
+    font-weight: 600;
+}
+
+.sie-pop .sie-tool:hover { background: rgb(255 255 255 / 20%); }
+
+.sie-pop .sie-area {
+    display: block;
+    width: 100%;
+    min-height: 38vh;
+    padding: 10px 12px;
+    border-radius: 6px;
+    background: #0f1115;
+    color: #e8eaee;
+    /* Monospace on purpose: this is the markdown source, not the page, and
+       it should not pretend to be a preview of it. */
+    font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+    font-size: 13px;
+    line-height: 1.6;
+    white-space: pre-wrap;
+    resize: vertical;
+    overflow: auto;
+}
+
+/* -------------------------------------------- the control panel overlay */
+
+.sie-panel,
+.sie-panel * {
+    all: unset;
+    box-sizing: border-box;
+    font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+.sie-panel {
+    position: fixed;
+    inset: 0;
+    z-index: 2147483002;
+    display: flex;
+    flex-direction: column;
+    background: #0a0d12;
+}
+
+.sie-panel[hidden] { display: none; }
+
+/* The page behind must not scroll while a full-screen frame is over it. */
+.sie-panel-open { overflow: hidden; }
+
+.sie-panel .sie-panel-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 10px 14px;
+    padding-top: calc(10px + env(safe-area-inset-top, 0px));
+    color: #f4f5f7;
+    font-size: 13px;
+    border-bottom: 1px solid rgb(255 255 255 / 12%);
+}
+
+.sie-panel .sie-panel-title {
+    font-weight: 500;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.sie-panel .sie-panel-close {
+    min-height: 40px;
+    padding: 0 14px;
+    border-radius: 6px;
+    background: rgb(255 255 255 / 14%);
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+.sie-panel .sie-panel-close:hover { background: rgb(255 255 255 / 24%); }
+
+.sie-panel .sie-frame {
+    display: block;
+    flex: 1;
+    width: 100%;
+    border: 0;
+    background: #fff;
+}
+
 @media (prefers-reduced-motion: reduce) {
     .sie-bar .sie-btn,
     .sie-editing [data-sie-field] {

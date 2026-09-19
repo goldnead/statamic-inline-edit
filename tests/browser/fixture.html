@@ -37,20 +37,47 @@
 </head>
 <body>
 
-<h1><span data-sie-id="entry-1" data-sie-field="hero_title" data-sie-type="text" data-sie-stamp="1700000000">Zuerst die Stimme</span></h1>
+<h1><span data-sie-id="entry-1" data-sie-field="hero_title" data-sie-type="text" data-sie-mode="text" data-sie-stamp="1700000000">Zuerst die Stimme</span></h1>
 
-<p class="meta">Von <span data-sie-id="entry-1" data-sie-field="author_name" data-sie-type="text" data-sie-stamp="1700000000">Adrian Goldner</span></p>
+<p class="meta">Von <span data-sie-id="entry-1" data-sie-field="author_name" data-sie-type="text" data-sie-mode="text" data-sie-stamp="1700000000">Adrian Goldner</span></p>
 
-<p><span data-sie-id="entry-1" data-sie-field="intro" data-sie-type="textarea" data-sie-stamp="1700000000" data-sie-multiline="true" data-sie-wraps="true">Im Chor wird musikalisch gearbeitet.
+<p><span data-sie-id="entry-1" data-sie-field="intro" data-sie-type="textarea" data-sie-mode="text" data-sie-stamp="1700000000" data-sie-multiline="true" data-sie-wraps="true">Im Chor wird musikalisch gearbeitet.
 Stimmtechnisch bleibt meistens vieles offen.</span></p>
 
-<p>A textarea whose value has no line break in it, so the server does not flag it and it renders exactly as a visitor sees it: <span data-sie-id="entry-1" data-sie-field="note" data-sie-type="textarea" data-sie-label="Notiz" data-sie-stamp="1700000000" data-sie-multiline="true">One paragraph, no breaks.</span></p>
+<p>A textarea whose value has no line break in it, so the server does not flag it and it renders exactly as a visitor sees it: <span data-sie-id="entry-1" data-sie-field="note" data-sie-type="textarea" data-sie-mode="text" data-sie-label="Notiz" data-sie-stamp="1700000000" data-sie-multiline="true">One paragraph, no breaks.</span></p>
 
 <p>This sentence is not editable and must never pick up an outline.</p>
 
-<p>A second entry on the same page: <span data-sie-id="entry-2" data-sie-field="title" data-sie-type="text" data-sie-stamp="1700000001">Ein zweiter Eintrag</span></p>
+<p>A second entry on the same page: <span data-sie-id="entry-2" data-sie-field="title" data-sie-type="text" data-sie-mode="text" data-sie-stamp="1700000001">Ein zweiter Eintrag</span></p>
 
-<p class="kicker-ish">An empty field, which has no box to click until the editor gives it one: <span data-sie-id="entry-1" data-sie-field="subtitle" data-sie-type="text" data-sie-label="Dachzeile" data-sie-stamp="1700000000"></span></p>
+<!--
+  The three modes version 2 added. Their markup is what src/Tags/Editable.php
+  emits for a toggle, a select, a markdown field and anything else, so the
+  shipped script is exercised against the real contract.
+-->
+
+<p>Hervorgehoben:
+<span data-sie-id="entry-1" data-sie-field="promoted" data-sie-type="toggle" data-sie-mode="control"
+      data-sie-raw="true" data-sie-reload="true" data-sie-label="Hervorgehoben"
+      data-sie-stamp="1700000000">ja</span></p>
+
+<p>Belegung:
+<span data-sie-id="entry-1" data-sie-field="belegung" data-sie-type="select" data-sie-mode="control"
+      data-sie-raw="offen" data-sie-reload="true" data-sie-label="Belegung"
+      data-sie-options='[{"value":"offen","label":"Offen"},{"value":"voll","label":"Ausgebucht"}]'
+      data-sie-stamp="1700000000">Offen</span></p>
+
+<div data-sie-id="entry-1" data-sie-field="body" data-sie-type="markdown" data-sie-mode="source"
+     data-sie-reload="true" data-sie-label="Text" data-sie-stamp="1700000000"><h2>Ein Kapitel</h2>
+<p>Mit einem <strong>Absatz</strong>.</p></div>
+<script type="application/json" class="sie-source">"## Ein Kapitel\n\nMit einem **Absatz**."</script>
+
+<p>Ein Bild, das nur das Control Panel kann:
+<span data-sie-id="entry-1" data-sie-field="hero" data-sie-type="assets" data-sie-mode="cp"
+      data-sie-reload="true" data-sie-label="Titelbild" data-sie-cp="about:blank"
+      data-sie-stamp="1700000000"><em>[Bild]</em></span></p>
+
+<p class="kicker-ish">An empty field, which has no box to click until the editor gives it one: <span data-sie-id="entry-1" data-sie-field="subtitle" data-sie-type="text" data-sie-mode="text" data-sie-label="Dachzeile" data-sie-stamp="1700000000"></span></p>
 
 <script id="statamic-inline-edit-config" type="application/json">
 {
@@ -70,7 +97,17 @@ Stimmtechnisch bleibt meistens vieles offen.</span></p>
     "empty_field": "Add :field",
     "conflict": "Someone else changed this page. Reload before saving.",
     "failed": "Could not save.",
-    "leave": "You have unsaved changes on this page."
+    "leave": "You have unsaved changes on this page.",
+    "leave_panel": "Unsaved changes. Open the control panel anyway?",
+    "done": "Done",
+    "close": "Close",
+    "on": "On",
+    "off": "Off",
+    "bold": "Bold",
+    "italic": "Italic",
+    "heading": "Heading",
+    "list": "List",
+    "link": "Link"
   }
 }
 </script>

@@ -1,5 +1,36 @@
 # Changelog
 
+## 1.1.0
+
+### Three more kinds of field
+
+Version 1 could edit text. Everything else on a page rendered normally and was not clickable,
+which on a real client site is most of it.
+
+- **`toggle`, `select` and `date` open a small control.** Their value is not the text on the
+  page: a toggle renders as whatever word the template chose, a date in whatever format it
+  wanted. So the element becomes a trigger rather than a text box, and it needs the pair form:
+  `{{ editable field="promoted" }}{{ if promoted }}ja{{ /if }}{{ /editable }}`. A select's
+  choices come from the blueprint, and the save route checks the arriving value against them
+  again rather than trusting the dropdown.
+- **`markdown` opens its own source, not the rendered HTML.** With a toolbar that writes the
+  same syntax a person would type. Editing rendered output means converting it back on every
+  save, and every such conversion loses something: the exact list marker, a reference link, a
+  deliberate HTML block. The source round-trips byte for byte.
+- **Everything else opens the control panel in an overlay.** Bard, Replicator, images, grids.
+  Bard alone is an entire editor and an asset picker is an entire browser; a second-rate copy
+  of either is worse than one click into the real one, and the real one brings its own
+  validation, revisions and permissions. Switch `control_panel` off if your control panel
+  cannot be framed.
+
+The three new kinds reload the page after saving, because only the server knows what the
+template will make of the new value. Text does not: what you typed is what is there.
+
+A toggle travels to the server as a real boolean rather than a string, so `false` and "" stay
+different things to the blueprint.
+
+30 PHP tests, 74 browser checks.
+
 ## 1.0.0
 
 ### The first version

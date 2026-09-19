@@ -87,16 +87,107 @@ class EditableTagTest extends TestCase
     }
 
     #[Test]
-    public function a_fieldtype_that_is_not_allowed_renders_without_a_marker(): void
+    public function a_toggle_becomes_a_control_around_whatever_the_template_rendered(): void
     {
         $this->makeCollection();
         $entry = $this->makeEntry(['title' => 'Hello', 'promoted' => true]);
 
         $this->actingAs($this->anEditor());
 
-        $out = $this->render('{{ editable:promoted }}', $entry->toAugmentedArray());
+        $out = $this->render(
+            '{{ editable field="promoted" }}{{ if promoted }}ja{{ else }}nein{{ /if }}{{ /editable }}',
+            $entry->toAugmentedArray()
+        );
+
+        $this->assertStringContainsString('data-sie-mode="control"', $out);
+        $this->assertStringContainsString('data-sie-raw="true"', $out);
+        $this->assertStringContainsString('data-sie-reload="true"', $out);
+        $this->assertStringContainsString('>ja</span>', $out);
+    }
+
+    #[Test]
+    public function a_select_carries_the_choices_the_blueprint_offers(): void
+    {
+        $this->makeCollection();
+        $entry = $this->makeEntry(['title' => 'Hello', 'belegung' => 'offen']);
+
+        $this->actingAs($this->anEditor());
+
+        $out = $this->render('{{ editable:belegung }}', $entry->toAugmentedArray());
+
+        $this->assertStringContainsString('data-sie-mode="control"', $out);
+        $this->assertStringContainsString('Ausgebucht', $out);
+        $this->assertStringContainsString('data-sie-raw="offen"', $out);
+    }
+
+    #[Test]
+    public function a_markdown_field_carries_its_own_source_next_to_it(): void
+    {
+        $this->makeCollection();
+        $entry = $this->makeEntry(['title' => 'Hello', 'body' => "# Titel\n\nEin **Absatz**."]);
+
+        $this->actingAs($this->anEditor());
+
+        $out = $this->render('{{ editable:body }}', $entry->toAugmentedArray());
+
+        $this->assertStringContainsString('data-sie-mode="source"', $out);
+
+        // The rendered HTML is on the page, the source travels beside it.
+        $this->assertStringContainsString('<strong>Absatz</strong>', $out);
+        $this->assertStringContainsString('class="sie-source"', $out);
+        $this->assertStringContainsString('# Titel', $out);
+    }
+
+    #[Test]
+    public function anything_else_points_at_the_control_panel(): void
+    {
+        $this->makeCollection();
+        $entry = $this->makeEntry(['title' => 'Hello']);
+
+        $this->actingAs($this->anEditor());
+
+        $out = $this->render(
+            '{{ editable field="hero" }}<img src="x.jpg" alt="">{{ /editable }}',
+            $entry->toAugmentedArray()
+        );
+
+        $this->assertStringContainsString('data-sie-mode="cp"', $out);
+        $this->assertStringContainsString('<img src="x.jpg"', $out);
+    }
+
+    #[Test]
+    public function with_the_control_panel_fallback_off_it_renders_bare(): void
+    {
+        config()->set('statamic-inline-edit.control_panel', false);
+
+        $this->makeCollection();
+        $entry = $this->makeEntry(['title' => 'Hello']);
+
+        $this->actingAs($this->anEditor());
+
+        $out = $this->render(
+            '{{ editable field="hero" }}<img src="x.jpg" alt="">{{ /editable }}',
+            $entry->toAugmentedArray()
+        );
 
         $this->assertStringNotContainsString('data-sie', $out);
+        $this->assertStringContainsString('<img src="x.jpg"', $out);
+    }
+
+    #[Test]
+    public function a_text_field_refuses_the_pair_form(): void
+    {
+        $this->makeCollection();
+        $entry = $this->makeEntry(['title' => 'Hello']);
+
+        $this->actingAs($this->anEditor());
+
+        // The template could have put a second field, a separator or markup
+        // in there, and innerText would then be saved over the value.
+        $out = $this->render('{{ editable field="title" }}<b>{{ title }}</b> ·{{ /editable }}', $entry->toAugmentedArray());
+
+        $this->assertStringNotContainsString('data-sie', $out);
+        $this->assertStringContainsString('<b>Hello</b>', $out);
     }
 
     #[Test]

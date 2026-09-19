@@ -85,6 +85,54 @@ class Editor
         return $type !== null && in_array($type, $this->fieldtypes(), true);
     }
 
+    /**
+     * How this fieldtype is edited, or null when it is not edited at all.
+     *
+     * The four are genuinely different interactions, not variations on one:
+     *
+     *  - `text`    the value is the text on the page, so the text is editable
+     *  - `control` the value is not on the page (a toggle renders as "ja"),
+     *              so the element is a trigger for a small control
+     *  - `source`  the value is text but the page shows it rendered, so the
+     *              rendered output is swapped for its own source
+     *  - `cp`      nothing we can do justice to here, so the control panel
+     *              opens over the page
+     *
+     * Order matters only in that the lists must not overlap; if a handle is
+     * on two of them, the first one here wins and the config is wrong.
+     */
+    public function modeFor(?string $type): ?string
+    {
+        if ($type === null) {
+            return null;
+        }
+
+        if (in_array($type, $this->fieldtypes(), true)) {
+            return 'text';
+        }
+
+        if (in_array($type, (array) config('statamic-inline-edit.controls', []), true)) {
+            return 'control';
+        }
+
+        if (in_array($type, (array) config('statamic-inline-edit.source', []), true)) {
+            return 'source';
+        }
+
+        return config('statamic-inline-edit.control_panel', true) ? 'cp' : null;
+    }
+
+    /**
+     * Which modes the save route will accept a value for.
+     *
+     * `cp` is absent on purpose: those fields are saved by the control panel
+     * itself, and this route must never become a way around its validation.
+     */
+    public function isWritableMode(?string $mode): bool
+    {
+        return in_array($mode, ['text', 'control', 'source'], true);
+    }
+
     public function isMultiline(?string $type): bool
     {
         return $type !== null && in_array($type, (array) config('statamic-inline-edit.multiline', []), true);

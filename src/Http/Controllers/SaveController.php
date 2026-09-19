@@ -153,7 +153,7 @@ class SaveController extends Controller
      * opens the console.
      *
      * @param  array<array-key, mixed>  $fields
-     * @return array<string, string>|JsonResponse
+     * @return array<string, string|bool>|JsonResponse
      */
     protected function readFields(Editor $editor, EntryContract $entry, array $fields): array|JsonResponse
     {
@@ -169,8 +169,17 @@ class SaveController extends Controller
 
             $field = $blueprint->hasField($handle) ? $blueprint->field($handle) : null;
 
-            if (! $field || ! $editor->isEditableFieldtype($field->type())) {
+            if (! $field || ! $editor->isWritableMode($editor->modeFor($field->type()))) {
                 return $this->error(__('statamic-inline-edit::messages.error_field', ['field' => $handle]), 422);
+            }
+
+            // A toggle posts a real boolean and keeps it: cast to a string it
+            // would arrive as "1" or "", and `false` and "" are the same
+            // thing to a string cast but not to a blueprint.
+            if (is_bool($value)) {
+                $values[$handle] = $value;
+
+                continue;
             }
 
             if (! is_string($value) && ! is_int($value) && ! is_float($value)) {
@@ -178,6 +187,13 @@ class SaveController extends Controller
             }
 
             $value = (string) $value;
+
+            // A select's choices are a fixed set, and the page said which.
+            // Checked here anyway: the dropdown in the browser is a
+            // suggestion, the request is what arrived.
+            if ($field->type() === 'select' && ! $this->isOffered($field, $value)) {
+                return $this->error(__('statamic-inline-edit::messages.error_field', ['field' => $handle]), 422);
+            }
 
             if (mb_strlen($value) > $editor->maxLength()) {
                 return $this->error(__('statamic-inline-edit::messages.error_long', ['field' => $handle]), 422);
@@ -190,6 +206,34 @@ class SaveController extends Controller
         }
 
         return $values;
+    }
+
+    /**
+     * Is this one of the choices the blueprint actually offers?
+     *
+     * A select with no fixed options is `taggable`, where any string is a
+     * legitimate value and the blueprint's own validation is the only gate.
+     * An empty value is always allowed: that is how a field is cleared.
+     */
+    protected function isOffered(mixed $field, string $value): bool
+    {
+        if ($value === '') {
+            return true;
+        }
+
+        $options = method_exists($field, 'get') ? $field->get('options') : null;
+
+        if (! is_array($options) || $options === []) {
+            return true;
+        }
+
+        foreach ($options as $key => $label) {
+            if ((string) (is_int($key) ? $label : $key) === $value) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**

@@ -49,10 +49,33 @@
         return (node.innerText || '').replace(/ /g, ' ').replace(/\s+$/, '');
     }
 
+    /**
+     * Fields whose new value is not visible on the page.
+     *
+     * A text field carries its own pending state: the text in the element is
+     * the change. A toggle, a select, a date and a markdown body do not, so
+     * what the person picked lives here until it is saved or discarded.
+     */
+    var pending = new Map();
+
     function dirty() {
         return nodes.filter(function (node) {
+            if (pending.has(node)) return true;
+            if ((node.dataset.sieMode || 'text') !== 'text') return false;
+
             return read(node) !== original.get(node);
         });
+    }
+
+    /** What would be sent for this node right now. */
+    function valueOf(node) {
+        return pending.has(node) ? pending.get(node) : read(node);
+    }
+
+    function setPending(node, value) {
+        pending.set(node, value);
+        node.classList.add('sie-changed');
+        paint();
     }
 
     /**
@@ -157,6 +180,8 @@
     function setEditing(on) {
         editing = on;
 
+        if (!on) closePop();
+
         try {
             on ? sessionStorage.setItem(STORAGE_KEY, '1') : sessionStorage.removeItem(STORAGE_KEY);
         } catch (e) {
@@ -200,6 +225,290 @@
         paint();
     }
 
+    /**
+     * Four kinds of field, four different ways in.
+     *
+     * `text` is the one from version 1: the value is the text on the page, so
+     * the text itself opens. The other three exist because their value is not
+     * what the page shows, and pretending otherwise is how an editor saves
+     * something they never saw.
+     */
+    function open(node) {
+        if (!editing) return;
+
+        var mode = node.dataset.sieMode || 'text';
+
+        if (mode === 'control') return openControl(node);
+        if (mode === 'source') return openSource(node);
+        if (mode === 'cp') return openPanel(node);
+
+        return startEditing(node);
+    }
+
+    /* -------------------------------------------------- popover and panel */
+
+    var pop = document.createElement('div');
+    pop.className = 'sie-pop';
+    pop.hidden = true;
+    var popFor = null;
+
+    function closePop() {
+        pop.hidden = true;
+        pop.innerHTML = '';
+        if (popFor) { popFor.focus(); popFor = null; }
+    }
+
+    /**
+     * Put the popover where the field is, and keep it on screen.
+     *
+     * Fixed rather than absolute so no `overflow: hidden` on some wrapper of
+     * the host site can clip it, which on a real client page is a matter of
+     * when, not if.
+     */
+    function placePop(node) {
+        var box = node.getBoundingClientRect();
+
+        pop.hidden = false;
+        pop.style.visibility = 'hidden';
+        pop.style.left = '0px';
+        pop.style.top = '0px';
+
+        var own = pop.getBoundingClientRect();
+        var gap = 8;
+        var left = Math.min(Math.max(gap, box.left), window.innerWidth - own.width - gap);
+        var below = box.bottom + gap;
+        var top = below + own.height + gap < window.innerHeight ? below : Math.max(gap, box.top - own.height - gap);
+
+        pop.style.left = Math.round(left) + 'px';
+        pop.style.top = Math.round(top) + 'px';
+        pop.style.visibility = '';
+    }
+
+    function openControl(node) {
+        popFor = node;
+        pop.innerHTML = '';
+        pop.className = 'sie-pop';
+
+        var label = document.createElement('span');
+        label.className = 'sie-pop-label';
+        label.textContent = node.dataset.sieLabel || node.dataset.sieField;
+        pop.appendChild(label);
+
+        var current = valueOf(node) === read(node) ? (node.dataset.sieRaw || '') : valueOf(node);
+        var input;
+
+        if (node.dataset.sieType === 'toggle') {
+            input = document.createElement('button');
+            input.type = 'button';
+            input.className = 'sie-switch';
+            var on = current === 'true' || current === '1';
+            input.setAttribute('aria-pressed', on ? 'true' : 'false');
+            input.textContent = on ? (L.on || 'An') : (L.off || 'Aus');
+            input.addEventListener('click', function () {
+                on = !on;
+                input.setAttribute('aria-pressed', on ? 'true' : 'false');
+                input.textContent = on ? (L.on || 'An') : (L.off || 'Aus');
+                setPending(node, on);
+            });
+        } else if (node.dataset.sieType === 'select') {
+            input = document.createElement('select');
+            input.className = 'sie-input';
+
+            var choices = [];
+            try {
+                choices = JSON.parse(node.dataset.sieOptions || '[]');
+            } catch (e) {
+                choices = [];
+            }
+
+            // An empty first entry, because clearing a field is a legitimate
+            // edit and a dropdown with no way back traps whoever picked wrong.
+            var blank = document.createElement('option');
+            blank.value = '';
+            blank.textContent = '—';
+            input.appendChild(blank);
+
+            choices.forEach(function (choice) {
+                var opt = document.createElement('option');
+                opt.value = choice.value;
+                opt.textContent = choice.label;
+                input.appendChild(opt);
+            });
+
+            input.value = current;
+            input.addEventListener('change', function () { setPending(node, input.value); });
+        } else {
+            input = document.createElement('input');
+            input.className = 'sie-input';
+            input.type = 'date';
+            // A stored date can carry a time; the input only takes the day.
+            input.value = (current || '').slice(0, 10);
+            input.addEventListener('change', function () { setPending(node, input.value); });
+        }
+
+        pop.appendChild(input);
+
+        var done = document.createElement('button');
+        done.type = 'button';
+        done.className = 'sie-pop-done';
+        done.textContent = L.done || 'Fertig';
+        done.addEventListener('click', closePop);
+        pop.appendChild(done);
+
+        placePop(node);
+        input.focus();
+    }
+
+    /**
+     * Markdown, edited as its own source rather than as rendered HTML.
+     *
+     * The page shows the rendered output, so there is no honest way to put a
+     * cursor in it: converting that HTML back to markdown on every save loses
+     * the exact list marker, the reference link, the deliberate HTML block.
+     * The source round-trips byte for byte, and the toolbar writes the same
+     * syntax the person would type.
+     */
+    function openSource(node) {
+        popFor = node;
+        pop.innerHTML = '';
+        pop.className = 'sie-pop sie-pop-wide';
+
+        var source = pending.has(node) ? pending.get(node) : sourceOf(node);
+
+        var tools = document.createElement('div');
+        tools.className = 'sie-tools';
+        pop.appendChild(tools);
+
+        var area = document.createElement('textarea');
+        area.className = 'sie-area';
+        area.value = source;
+        area.spellcheck = true;
+
+        [
+            { label: 'B', title: L.bold || 'Fett', wrap: ['**', '**'] },
+            { label: 'I', title: L.italic || 'Kursiv', wrap: ['*', '*'] },
+            { label: '#', title: L.heading || 'Überschrift', line: '## ' },
+            { label: '•', title: L.list || 'Liste', line: '- ' },
+            { label: '↗', title: L.link || 'Link', wrap: ['[', '](https://)'] },
+        ].forEach(function (tool) {
+            var btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'sie-tool';
+            btn.textContent = tool.label;
+            btn.title = tool.title;
+            btn.addEventListener('click', function () {
+                tool.line ? prefixLine(area, tool.line) : wrapSelection(area, tool.wrap[0], tool.wrap[1]);
+                setPending(node, area.value);
+            });
+            tools.appendChild(btn);
+        });
+
+        area.addEventListener('input', function () { setPending(node, area.value); });
+        area.addEventListener('keydown', function (event) {
+            if (event.key === 'Escape') { event.preventDefault(); closePop(); }
+        });
+
+        pop.appendChild(area);
+
+        var done = document.createElement('button');
+        done.type = 'button';
+        done.className = 'sie-pop-done';
+        done.textContent = L.done || 'Fertig';
+        done.addEventListener('click', closePop);
+        pop.appendChild(done);
+
+        placePop(node);
+        area.focus();
+    }
+
+    /** The raw markdown the server put next to the element. */
+    function sourceOf(node) {
+        var holder = node.nextElementSibling;
+
+        if (!holder || !holder.classList.contains('sie-source')) return '';
+
+        try {
+            return JSON.parse(holder.textContent || '""');
+        } catch (e) {
+            return '';
+        }
+    }
+
+    function wrapSelection(area, before, after) {
+        var a = area.selectionStart;
+        var b = area.selectionEnd;
+        var selected = area.value.slice(a, b);
+
+        area.value = area.value.slice(0, a) + before + selected + after + area.value.slice(b);
+        area.focus();
+        area.setSelectionRange(a + before.length, a + before.length + selected.length);
+    }
+
+    function prefixLine(area, prefix) {
+        var a = area.selectionStart;
+        var start = area.value.lastIndexOf('\n', a - 1) + 1;
+
+        area.value = area.value.slice(0, start) + prefix + area.value.slice(start);
+        area.focus();
+        area.setSelectionRange(a + prefix.length, a + prefix.length);
+    }
+
+    /* ------------------------------------------------------ control panel */
+
+    var panel = document.createElement('div');
+    panel.className = 'sie-panel';
+    panel.hidden = true;
+    panel.innerHTML =
+        '<div class="sie-panel-bar">' +
+        '<span class="sie-panel-title"></span>' +
+        '<button type="button" class="sie-panel-close"></button>' +
+        '</div>' +
+        '<iframe class="sie-frame" title=""></iframe>';
+
+    var panelTitle = panel.querySelector('.sie-panel-title');
+    var panelClose = panel.querySelector('.sie-panel-close');
+    var frame = panel.querySelector('.sie-frame');
+
+    panelClose.textContent = L.close || 'Schließen';
+
+    /**
+     * Bard, Replicator, a Grid, an image: the real control panel, in an
+     * overlay, rather than a second-rate copy of it here.
+     *
+     * Bard alone is an entire editor and an asset picker is an entire
+     * browser. Rebuilding either on the frontend means a worse one that also
+     * has to be kept in step with core. Opening the real one costs a click,
+     * and everything that happens in it goes through the control panel's own
+     * validation, revisions and permissions.
+     */
+    function openPanel(node) {
+        var url = node.dataset.sieCp;
+
+        if (!url) return;
+
+        if (dirty().length && !window.confirm(L.leave_panel || L.leave || '')) return;
+
+        panelTitle.textContent = node.dataset.sieLabel || node.dataset.sieField;
+        frame.title = panelTitle.textContent;
+        frame.src = url;
+        panel.hidden = false;
+        document.documentElement.classList.add('sie-panel-open');
+        panelClose.focus();
+    }
+
+    function closePanel() {
+        panel.hidden = true;
+        frame.removeAttribute('src');
+        document.documentElement.classList.remove('sie-panel-open');
+
+        // Whatever happened in there happened to the entry, not to this page.
+        // Reloading is the only honest way to show it, and it is also the only
+        // way to find out that nothing happened.
+        window.location.reload();
+    }
+
+    panelClose.addEventListener('click', closePanel);
+
     function startEditing(node) {
         if (!editing || node.isContentEditable) return;
 
@@ -234,7 +543,7 @@
         node.addEventListener('dblclick', function (event) {
             if (!editing) return;
             event.preventDefault();
-            startEditing(node);
+            open(node);
         });
 
         // A double-click is a mouse gesture. On a touch screen a double-tap is
@@ -249,7 +558,7 @@
         node.addEventListener('pointerup', function (event) {
             if (!editing || event.pointerType !== 'touch' || node.isContentEditable) return;
             event.preventDefault();
-            startEditing(node);
+            open(node);
         });
 
         node.addEventListener('keydown', function (event) {
@@ -258,7 +567,7 @@
                 // reachable without a mouse.
                 if (editing && (event.key === 'Enter' || event.key === ' ')) {
                     event.preventDefault();
-                    startEditing(node);
+                    open(node);
                 }
                 return;
             }
@@ -313,7 +622,19 @@
                 byEntry[id] = { id: id, stamp: node.dataset.sieStamp || null, fields: {} };
             }
 
-            byEntry[id].fields[node.dataset.sieField] = read(node).slice(0, config.maxLength || 100000);
+            var value = valueOf(node);
+
+            // A toggle's value is a real boolean all the way to the blueprint.
+            // Cut to length only what has a length: slicing `false` gives "fal".
+            byEntry[id].fields[node.dataset.sieField] =
+                typeof value === 'string' ? value.slice(0, config.maxLength || 100000) : value;
+        });
+
+        // Anything whose rendered output differs from what was typed: a
+        // toggle the template turns into a word, markdown the renderer turns
+        // into HTML. The page has to come back from the server to be true.
+        var needsReload = changed.some(function (node) {
+            return node.dataset.sieReload === 'true';
         });
 
         busy = true;
@@ -355,12 +676,19 @@
                 });
 
                 changed.forEach(function (node) {
+                    pending.delete(node);
+                    node.classList.remove('sie-changed');
                     original.set(node, read(node));
                     node.classList.toggle('sie-empty', read(node) === '');
                 });
 
                 status(L.saved || 'Saved', 'ok');
                 paint();
+
+                if (needsReload) {
+                    closePop();
+                    window.location.reload();
+                }
             })
             .catch(function () {
                 busy = false;
@@ -370,7 +698,21 @@
     }
 
     function discard() {
-        dirty().forEach(revert);
+        closePop();
+
+        dirty().forEach(function (node) {
+            if (pending.has(node)) {
+                // Nothing to put back on the page: what was picked never
+                // showed there. Dropping it is the whole undo.
+                pending.delete(node);
+                node.classList.remove('sie-changed');
+
+                return;
+            }
+
+            revert(node);
+        });
+
         status('');
         paint();
     }
@@ -400,6 +742,24 @@
     });
 
     document.body.appendChild(bar);
+    document.body.appendChild(pop);
+    document.body.appendChild(panel);
+
+    // A click anywhere that is not the popover, the field it belongs to, or
+    // the bar closes it. Whatever was picked is already pending, so closing
+    // is never a way to lose a choice.
+    document.addEventListener('mousedown', function (event) {
+        if (pop.hidden) return;
+        if (pop.contains(event.target) || bar.contains(event.target)) return;
+        if (popFor && popFor.contains(event.target)) return;
+        closePop();
+    });
+
+    document.addEventListener('keydown', function (event) {
+        if (event.key !== 'Escape') return;
+        if (!panel.hidden) { closePanel(); return; }
+        if (!pop.hidden) closePop();
+    });
 
     // Give the bar its own space at the end of the document instead of letting
     // it lie on top of whatever the page put down there. A spacer element
