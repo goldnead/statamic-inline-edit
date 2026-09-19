@@ -334,7 +334,26 @@
     white-space: pre-wrap;
 }
 
-/* An empty field has no box to click. Give it one, and say which field it is.
+/* An empty field has no box to click, so it gets one.
+ *
+ * Reserved outside `.sie-editing` on purpose: scoped to edit mode, the chip
+ * appears the instant the bar opens and pushes the whole page down by its own
+ * height. Measured on the demo page, 23px, every time somebody starts
+ * editing. Here the space is there from the first paint, so switching edit
+ * mode on moves nothing; only the chip's ink arrives.
+ *
+ * It costs an editor a gap where a visitor sees none, which is the same trade
+ * `data-sie-wraps` makes above, for the same reason: what the editor sees has
+ * to be stable, because they are the one working in it. */
+[data-sie-field].sie-empty::before {
+    content: "";
+    display: inline-block;
+    min-width: 8rem;
+    min-height: 1.75em;
+    vertical-align: middle;
+}
+
+/* And in edit mode the same box says which field it is.
  *
  * The chip resets its own typography on purpose. Inherited, the placeholder
  * picks up whatever the host site does to that element, and in a 48px display
@@ -631,11 +650,21 @@
    almost no styling of its own: the heading stays the site's heading, the
    paragraph the site's paragraph. That is the whole point of editing in
    place rather than in a box. */
+/* A ring and nothing else.
+ *
+ * It used to get the ring, a blue wash and the kind badge all at once: three
+ * signals for one state, on a block that is supposed to read as the page.
+ * Statamic's own Bard shows a thin ring on focus and no fill, and that is
+ * the right amount. The single-line fields keep their wash, because on a
+ * word or a date there is nothing else to see. */
 .sie-rich-host {
     outline: 2px solid #3b82f6 !important;
     outline-offset: 6px;
     border-radius: 2px;
+    background: none !important;
 }
+
+.sie-rich-host::after { display: none; }
 
 .sie-rich:focus,
 .sie-rich:focus-visible {

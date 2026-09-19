@@ -89,15 +89,15 @@ await page.waitForFunction(() => document.querySelector('.sie-status').textConte
 console.log('restored the original title');
 
 await page.setViewportSize({ width: 390, height: 844 });
-await page.reload({ waitUntil: 'domcontentloaded' });
 
-// Edit mode survives a reload through sessionStorage, so clicking the toggle
-// here would switch it off and photograph the wrong state. Wait for it to
-// restore itself instead, and only click if it did not.
-await page.waitForSelector('.sie-bar');
-if (await page.locator('.sie-launch').isVisible()) {
-    await page.locator('.sie-launch').click();
-}
+// At rest first: the review had no picture of the phone with nothing
+// switched on, so the launcher on a phone was never shown at all.
+await page.evaluate(() => { try { sessionStorage.clear(); } catch (e) {} });
+await page.reload({ waitUntil: 'domcontentloaded' });
+await page.waitForSelector('.sie-launch');
+await shot('6a-phone-launcher');
+
+await page.locator('.sie-launch').click();
 await shot('6-phone');
 
 // The state the critique could not judge from a still: a field opened by a
@@ -164,6 +164,12 @@ await page.locator('[data-sie-field="body"]').dispatchEvent('pointerup', { point
 await page.waitForSelector('.sie-rich', { timeout: 20000 });
 await page.waitForTimeout(500);
 await shot('12-phone-markdown');
+
+// Seven word buttons at 390px is tight, and the review had no picture of it.
+await page.locator('.sie-rich p').first().dblclick({ position: { x: 24, y: 10 } });
+await page.waitForTimeout(400);
+console.log('phone bubble = ' + (await page.locator('.sie-bubble').isVisible()));
+await shot('12b-phone-bubble');
 await page.keyboard.press('Escape');
 
 await page.locator('[data-sie-field="schlagworte"]').dispatchEvent('pointerup', { pointerType: 'touch', bubbles: true });

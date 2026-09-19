@@ -96,9 +96,20 @@ function makeBubble(editor, labels) {
         const centre = (Math.min(start.left, end.left) + Math.max(start.right, end.right)) / 2;
         const left = Math.min(Math.max(8, centre - own.width / 2), window.innerWidth - own.width - 8);
         const above = Math.min(start.top, end.top) - own.height - 8;
+        const below = Math.max(start.bottom, end.bottom) + 8;
+
+        // Above the selection, unless there is text of this field's own
+        // directly above it. Placing the toolbar over the heading somebody
+        // just wrote, to edit the sentence under it, hides the very thing
+        // they are working against. Checked against the field's own top edge
+        // rather than the viewport, which is what the old `above > 8` test
+        // measured and why it never caught this.
+        const fieldTop = editor.view.dom.getBoundingClientRect().top;
+        const roomAbove = above > 8 && Math.min(start.top, end.top) - fieldTop < 4;
+        const roomBelow = below + own.height < window.innerHeight - 8;
 
         bar.style.left = Math.round(left) + 'px';
-        bar.style.top = Math.round(above > 8 ? above : Math.max(start.bottom, end.bottom) + 8) + 'px';
+        bar.style.top = Math.round(roomAbove || !roomBelow ? Math.max(8, above) : below) + 'px';
         bar.style.visibility = '';
 
         paint();
@@ -144,7 +155,25 @@ function mount(element, options) {
             // The markdown shortcuts everybody expects come from here:
             // `## ` for a heading, `- ` for a list, `> ` for a quote,
             // `**bold**` as you type, `---` for a rule.
-            StarterKit.configure({ link: false }),
+            StarterKit.configure({
+                link: false,
+
+                // Off, and this one is not cosmetic.
+                //
+                // The trailing node is an empty paragraph ProseMirror appends
+                // when a document ends with a list or a quote, so there is
+                // somewhere to type after it. It is also content that is not
+                // in the document: on a field whose markdown ends with a
+                // list, mounting the editor made the block 36px taller and
+                // pushed everything below it down the page, then pulled it
+                // back up on close. Measured on the demo page, where the
+                // last child went from UL to P at the moment of mount.
+                //
+                // The cost is small and recoverable: to write after a list,
+                // press Enter twice at the end of the last item, which is
+                // what every editor does anyway.
+                trailingNode: false,
+            }),
             Link.configure({ openOnClick: false, autolink: true }),
             Markdown.configure({
                 // `-` for bullets and `*` for emphasis, which is what

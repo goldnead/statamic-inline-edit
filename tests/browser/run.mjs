@@ -351,11 +351,28 @@ const badges = await page.evaluate(() =>
     Array.from(document.querySelectorAll('[data-sie-field]')).map((n) => [n.dataset.sieMode, n.dataset.sieBadge].join(':'))
 );
 check(
-    'every field says which kind it is',
-    badges.every((b) => b.split(':')[1]),
+    'a field with room says which kind it is',
+    badges.filter((b) => b.split(':')[1]).length >= 4,
     JSON.stringify(badges)
 );
-check('and they are not all the same word', new Set(badges.map((b) => b.split(':')[1])).size === 4, JSON.stringify(badges));
+// Every badge that is shown has to name its own mode. Not "four distinct
+// words": on this page the control and cp fields are single words in a row
+// of facts, too narrow for a badge, and they correctly have none.
+const WORDS = { text: 'Text', control: 'Value', source: 'Markdown', cp: 'Control panel' };
+check(
+    'and each one names its own kind',
+    badges.every((b) => { const [mode, word] = b.split(':'); return word === '' || word === WORDS[mode]; }),
+    JSON.stringify(badges)
+);
+
+// A badge sits to the right of its field. In a row of four facts, the right
+// of one field is the value of the next, so a narrow field gets none.
+const narrowBadges = await page.evaluate(() =>
+    Array.from(document.querySelectorAll('[data-sie-field]'))
+        .filter((n) => n.getBoundingClientRect().width < 140)
+        .map((n) => n.dataset.sieBadge || '')
+);
+check('a narrow one keeps quiet', narrowBadges.every((b) => b === ''), JSON.stringify(narrowBadges));
 
 // Quiet until asked. Always-on was tried and reverted: on a row of four
 // fields the badge of one sits on the value of the next.
@@ -587,7 +604,15 @@ console.log('\nmarkdown shortcuts');
 
 await page.locator('.sie-rich').click();
 await page.keyboard.press('ControlOrMeta+End');
+
+// The document ends with a list, and the trailing paragraph ProseMirror
+// would otherwise append is switched off because it moved the page. Enter
+// twice leaves the list, which is the way out every editor has and the one
+// the comment in rich.js promises.
 await page.keyboard.press('Enter');
+await page.keyboard.press('Enter');
+check('Enter twice gets you out of a list', (await page.locator('.sie-rich > p').count()) >= 2);
+
 await page.keyboard.type('### Neue Ueberschrift');
 check('typing ### makes a heading', (await page.locator('.sie-rich h3').count()) === 1);
 
@@ -620,9 +645,20 @@ await page.locator('.sie-rich h3').first().dblclick({ position: { x: 14, y: 12 }
 await page.waitForTimeout(250);
 const bubble = page.locator('.sie-bubble');
 check('selecting text raises it', await bubble.isVisible());
+// Next to the selection, above or below it. Below when there is text of the
+// field's own above, so the toolbar never covers the line somebody just
+// wrote to edit the one under it.
+const selBox = await page.locator('.sie-rich h3').first().boundingBox();
+const bubBox = await bubble.boundingBox();
 check(
-    'over the selection, not in a corner',
-    (await bubble.boundingBox()).y < (await page.locator('.sie-rich h3').first().boundingBox()).y + 10
+    'right next to the selection',
+    Math.abs(bubBox.y - selBox.y) < 90,
+    'bubble at ' + Math.round(bubBox.y) + ', selection at ' + Math.round(selBox.y)
+);
+check(
+    'and below it, because there is a line above',
+    bubBox.y > selBox.y,
+    'placed above would cover the heading that was just written'
 );
 const tools = await page.locator('.sie-bubble-btn').allTextContents();
 check('with the usual suspects', JSON.stringify(tools) === '["Bold","Italic","H2","H3","List","Quote","Link"]', JSON.stringify(tools));

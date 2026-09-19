@@ -15,17 +15,34 @@
 <link rel="stylesheet" href="../../resources/dist/inline-edit.css">
 
 <style>
+    /* Deliberately the margins a real site has. The first version of this
+       fixture gave the block's children no bottom margin, so the field could
+       not grow when Tiptap stopped that margin collapsing out of it, and a
+       test that claimed to measure the jump measured nothing. */
     body { font-family: Georgia, serif; max-width: 42rem; margin: 0 auto; padding: 3rem 1.5rem 8rem; line-height: 1.6; }
     h2 { font-size: 1.6rem; margin: 0 0 .5rem; }
+    p { margin: 0 0 1.2em; }
+    ul { margin: 0 0 1.5em; padding-left: 1.4em; }
+    .after { border-top: 1px solid #ddd; padding-top: 1rem; color: #666; }
 </style>
 </head>
 <body>
 
 <article>
+<!--
+  Ends with a list on purpose. ProseMirror appends an empty trailing
+  paragraph when a document ends with anything that is not a paragraph, so
+  this is the shape in which mounting the editor used to make the block 36px
+  taller and push the rest of the page down. A fixture that ended with a
+  paragraph could not reproduce it, and the test that claimed to measure the
+  jump measured nothing.
+-->
 <div data-sie-id="entry-1" data-sie-field="body" data-sie-type="markdown" data-sie-mode="source"
      data-sie-reload="true" data-sie-label="Text" data-sie-stamp="1700000000"><h2>Ein Kapitel</h2>
-<p>Mit einem <strong>Absatz</strong>.</p></div>
-<script type="application/json" class="sie-source">"## Ein Kapitel\n\nMit einem **Absatz**."</script>
+<p>Mit einem <strong>Absatz</strong>.</p>
+<ul><li>Erstens</li><li>Zweitens</li></ul></div>
+<script type="application/json" class="sie-source">"## Ein Kapitel\n\nMit einem **Absatz**.\n\n- Erstens\n- Zweitens"</script>
+<p class="after">Etwas, das unter dem Feld steht und sich nicht bewegen darf.</p>
 </article>
 
 <script id="statamic-inline-edit-config" type="application/json">

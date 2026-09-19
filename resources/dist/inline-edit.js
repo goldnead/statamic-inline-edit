@@ -239,7 +239,18 @@
         nodes.forEach(function (node) {
             if (on) {
                 node.setAttribute('tabindex', '0');
-                node.dataset.sieBadge = BADGES[node.dataset.sieMode || 'text'] || '';
+                // No badge on a narrow field. It sits to the right, and in a
+                // row of four facts the right of one field is the value of
+                // the next: the label of "Belegung" landed on "Beginn". The
+                // dashed outline still says editable, and the control that
+                // opens names its own kind in its header.
+                var wide = node.getBoundingClientRect().width >= 140;
+
+                if (wide) {
+                    node.dataset.sieBadge = BADGES[node.dataset.sieMode || 'text'] || '';
+                } else {
+                    delete node.dataset.sieBadge;
+                }
                 node.classList.toggle('sie-empty', read(node) === '');
                 if (read(node) === '') node.setAttribute('data-sie-placeholder', placeholder(node));
             } else {
@@ -837,6 +848,13 @@
 
     nodes.forEach(function (node) {
         original.set(node, read(node));
+
+        // Marked at boot, not when edit mode comes on. An empty field has no
+        // height of its own, and the box that makes it clickable is 23px
+        // tall: added on the toggle, it pushes the whole page down at the
+        // moment somebody starts working. Here the space is there from the
+        // first paint and only the chip's ink arrives later.
+        node.classList.toggle('sie-empty', read(node) === '');
 
         node.addEventListener('dblclick', function (event) {
             if (!editing) return;

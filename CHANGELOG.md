@@ -36,7 +36,7 @@ every space typed into the rich editor, because Tiptap mounts its contenteditabl
 of the marker. Typing `## ` produced `##`, so the markdown shortcut that is the whole point
 never fired.
 
-35 PHP tests, 105 browser checks.
+35 PHP tests, 108 browser checks.
 
 ## 1.1.0
 
