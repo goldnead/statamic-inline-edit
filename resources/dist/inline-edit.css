@@ -1,0 +1,144 @@
+/*!
+ * Statamic Inline Edit
+ *
+ * Two jobs, and the second one is why this file is longer than it looks:
+ * style the bar, and stop the host site's stylesheet from styling it. The bar
+ * lands inside somebody else's CSS, where `button { width: 100% }` and a
+ * global `* { font-family }` are both completely normal. Hence the reset.
+ *
+ * Everything is prefixed `sie-`. Nothing here selects an element the site owns
+ * except through our own data attributes.
+ */
+
+.sie-bar,
+.sie-bar * {
+    all: unset;
+    box-sizing: border-box;
+    font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+.sie-bar {
+    position: fixed;
+    z-index: 2147483000;
+    inset-inline-start: 50%;
+    inset-block-end: 20px;
+    transform: translateX(-50%);
+
+    display: flex;
+    align-items: center;
+    gap: 10px;
+
+    padding: 8px 10px;
+    border-radius: 10px;
+    background: #16181d;
+    color: #f4f5f7;
+    box-shadow: 0 8px 30px rgb(0 0 0 / 35%), 0 0 0 1px rgb(255 255 255 / 8%) inset;
+
+    font-size: 13px;
+    line-height: 1.4;
+    max-width: calc(100vw - 32px);
+}
+
+.sie-bar .sie-btn {
+    cursor: pointer;
+    padding: 6px 12px;
+    border-radius: 6px;
+    background: rgb(255 255 255 / 8%);
+    color: inherit;
+    white-space: nowrap;
+    transition: background 120ms ease, opacity 120ms ease;
+}
+
+.sie-bar .sie-btn:hover:not([disabled]) {
+    background: rgb(255 255 255 / 16%);
+}
+
+.sie-bar .sie-btn:focus-visible {
+    outline: 2px solid #5b9dff;
+    outline-offset: 2px;
+}
+
+.sie-bar .sie-btn[disabled] {
+    opacity: 0.35;
+    cursor: default;
+}
+
+.sie-bar .sie-toggle.sie-on {
+    background: #5b9dff;
+    color: #0b1020;
+}
+
+.sie-bar .sie-primary:not([disabled]) {
+    background: #3ecf8e;
+    color: #06231a;
+}
+
+.sie-bar .sie-primary:hover:not([disabled]) {
+    background: #34b87e;
+}
+
+.sie-bar .sie-count {
+    opacity: 0.65;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.sie-bar .sie-status {
+    white-space: nowrap;
+}
+
+.sie-bar .sie-status.sie-ok {
+    color: #3ecf8e;
+}
+
+.sie-bar .sie-status.sie-bad {
+    color: #ff8087;
+    white-space: normal;
+    max-width: 40ch;
+}
+
+/* The fields themselves. Nothing applies until edit mode is on, so an editor
+   who is only reading sees the page exactly as a visitor does. */
+
+.sie-editing [data-sie-field] {
+    outline: 1px dashed rgb(91 157 255 / 55%);
+    outline-offset: 3px;
+    border-radius: 2px;
+    cursor: text;
+    transition: background 120ms ease, outline-color 120ms ease;
+}
+
+.sie-editing [data-sie-field]:hover {
+    outline-color: rgb(91 157 255 / 100%);
+    background: rgb(91 157 255 / 8%);
+}
+
+.sie-editing [data-sie-field].sie-active {
+    outline: 2px solid #5b9dff;
+    background: rgb(91 157 255 / 10%);
+}
+
+/* A textarea's line breaks have to survive the round trip through innerText,
+   so the wrapper has to actually render them. */
+.sie-editing [data-sie-field][data-sie-multiline="true"] {
+    white-space: pre-wrap;
+}
+
+/* An empty field has no box to click. Give it one, and say what it is. */
+.sie-editing [data-sie-field].sie-empty::before {
+    content: attr(data-sie-placeholder);
+    opacity: 0.45;
+    font-style: italic;
+}
+
+.sie-editing [data-sie-field].sie-empty.sie-active::before {
+    content: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .sie-bar .sie-btn,
+    .sie-editing [data-sie-field] {
+        transition: none;
+    }
+}

@@ -1,0 +1,25 @@
+includes:
+    - vendor/larastan/larastan/extension.neon
+
+parameters:
+    level: 5
+
+    paths:
+        - src
+
+    ignoreErrors:
+        # Statamic\Contracts\Entries\Entry is an empty marker interface: it
+        # extends Localizable and declares nothing of its own. Every method
+        # called on it here (id, blueprint, merge, save, locale,
+        # collectionHandle, lastModified) lives on Statamic\Entries\Entry,
+        # which is the implementation core ships and the one every site runs
+        # unless it deliberately substitutes another.
+        #
+        # Typing against that concrete class instead would silence this and be
+        # wrong: the entry repository is swappable, and a site that swaps it is
+        # exactly who the contract is for. The tests exercise all of these
+        # against a real entry, so a name that stops existing fails there.
+        -
+            identifier: method.notFound
+            message: '#Call to an undefined method Statamic\\Contracts\\Entries\\Entry::#'
+            path: src/Http/Controllers/SaveController.php

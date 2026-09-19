@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Inline Edit fixture</title>
+
+<!--
+  A stand-in for a page the tag has already rendered on. No Statamic, no PHP:
+  the markers below are byte for byte what src/Tags/Editable.php emits, so the
+  shipped script is exercised against the real contract rather than a
+  convenient one. If the tag's attribute names change, this file has to change
+  with it, and run.mjs fails loudly if it does not.
+-->
+
+<link rel="stylesheet" href="../../resources/dist/inline-edit.css">
+
+<style>
+    body {
+        font-family: Georgia, serif;
+        max-width: 42rem;
+        margin: 0 auto;
+        padding: 4rem 1.5rem 8rem;
+        color: #1b1b1f;
+        line-height: 1.6;
+    }
+    h1 { font-size: 2.6rem; line-height: 1.15; margin: 0 0 1rem; }
+    .meta { color: #6b6b73; font-size: 0.9rem; }
+
+    /* The host site is hostile to a floating bar on purpose: a global button
+       rule is completely normal out there, and the bar has to survive it. */
+    button { width: 100%; background: hotpink; font-size: 2rem; border: 4px solid lime; }
+</style>
+</head>
+<body>
+
+<h1><span data-sie-id="entry-1" data-sie-field="hero_title" data-sie-type="text" data-sie-stamp="1700000000">Zuerst die Stimme</span></h1>
+
+<p class="meta">Von <span data-sie-id="entry-1" data-sie-field="author_name" data-sie-type="text" data-sie-stamp="1700000000">Adrian Goldner</span></p>
+
+<p><span data-sie-id="entry-1" data-sie-field="intro" data-sie-type="textarea" data-sie-stamp="1700000000" data-sie-multiline="true">Im Chor wird musikalisch gearbeitet.
+Stimmtechnisch bleibt meistens vieles offen.</span></p>
+
+<p>This sentence is not editable and must never pick up an outline.</p>
+
+<p>A second entry on the same page: <span data-sie-id="entry-2" data-sie-field="title" data-sie-type="text" data-sie-stamp="1700000001">Ein zweiter Eintrag</span></p>
+
+<p>An empty field, which has no box to click until the editor gives it one: <span data-sie-id="entry-1" data-sie-field="subtitle" data-sie-type="text" data-sie-stamp="1700000000"></span></p>
+
+<script id="statamic-inline-edit-config" type="application/json">
+{
+  "saveUrl": "https://fixture.test/!/statamic-inline-edit/save",
+  "csrf": "test-csrf-token",
+  "maxLength": 100000,
+  "labels": {
+    "edit": "Edit page",
+    "editing": "Editing",
+    "save": "Save",
+    "saving": "Saving…",
+    "saved": "Saved",
+    "discard": "Discard",
+    "unsaved": ":count unsaved",
+    "hint": "Double-click any highlighted text.",
+    "empty": "Empty",
+    "conflict": "Someone else changed this page. Reload before saving.",
+    "failed": "Could not save.",
+    "leave": "You have unsaved changes on this page."
+  }
+}
+</script>
+<script src="../../resources/dist/inline-edit.js"></script>
+
+</body>
+</html>

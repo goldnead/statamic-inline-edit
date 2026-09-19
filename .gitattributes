@@ -1,0 +1,19 @@
+# Without this, every site that installs the addon downloads its tests and CI
+# config. Keep: /config, /lang, /resources/dist, /routes, /src, README.md,
+# CHANGELOG.md, LICENSE.md.
+
+/.github            export-ignore
+/tests              export-ignore
+/.gitattributes     export-ignore
+/.gitignore         export-ignore
+/.editorconfig      export-ignore
+/phpunit.xml        export-ignore
+/phpunit.xml.dist   export-ignore
+/phpstan.neon       export-ignore
+/pint.json          export-ignore
+/addon-lint.json    export-ignore
+
+# The browser test harness. /tests is already ignored above; these two are what
+# would otherwise make every installing site download playwright.
+/package.json       export-ignore
+/package-lock.json  export-ignore

@@ -1,0 +1,24 @@
+{
+  "_why": [
+    "ui.statamic-cms-package reads a package.json as meaning a Control Panel Vite build, and asks",
+    "for @statamic/cms in devDependencies so the UI kit is pinned to the Statamic version in vendor/.",
+    "",
+    "This addon has no Control Panel surface at all. It renders one frontend tag, ships a hand-written",
+    "stylesheet and script with no build step, and imports nothing from @statamic/cms/ui. The",
+    "package.json exists for exactly one dependency: playwright-core, which drives tests/browser/run.mjs",
+    "for the behaviour that only exists in a browser — double-click to edit, the dirty count, Escape",
+    "reverting, the shape of the save request, and the bar surviving a hostile host stylesheet. Adding",
+    "the dependency would pull in a UI kit nothing imports.",
+    "",
+    "Revisit this the day the addon grows a real CP screen — then the rule is right and this entry is",
+    "wrong.",
+    "",
+    "release.editions is an INFO, not a rule, and it asks a question rather than reporting a fault:",
+    "\"Confirm this is a single-edition commercial addon.\" Confirmed on 2026-09-19 — one product, no",
+    "Core/Pro split, sold inside the suite. The field stays absent because the linter is right that a",
+    "declared edition without a feature behind it cannot gate anything."
+  ],
+  "disable": [
+    "ui.statamic-cms-package"
+  ]
+}

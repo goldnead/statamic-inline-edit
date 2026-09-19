@@ -1,0 +1,78 @@
+{
+  "name": "goldnead/statamic-inline-edit",
+  "description": "Edit text straight on the live page. Double-click, type, save. No control panel, no page builder.",
+  "type": "statamic-addon",
+  "license": "proprietary",
+  "keywords": [
+    "statamic",
+    "statamic-addon",
+    "inline-editing",
+    "frontend-editing",
+    "editor"
+  ],
+  "autoload": {
+    "psr-4": {
+      "Goldnead\\StatamicInlineEdit\\": "src/"
+    }
+  },
+  "autoload-dev": {
+    "psr-4": {
+      "Goldnead\\StatamicInlineEdit\\Tests\\": "tests"
+    }
+  },
+  "extra": {
+    "statamic": {
+      "slug": "statamic-inline-edit",
+      "name": "Statamic Inline Edit",
+      "description": "Edit text straight on the live page. Double-click, type, save.",
+      "url": "https://github.com/goldnead/statamic-inline-edit",
+      "developer": "Adrian Goldner",
+      "developer-url": "https://adriangoldner.dev"
+    },
+    "laravel": {
+      "providers": [
+        "Goldnead\\StatamicInlineEdit\\ServiceProvider"
+      ]
+    }
+  },
+  "authors": [
+    {
+      "name": "Adrian Goldner",
+      "email": "info@adriangoldner.com"
+    }
+  ],
+  "support": {
+    "issues": "https://github.com/goldnead/statamic-inline-edit/issues",
+    "source": "https://github.com/goldnead/statamic-inline-edit"
+  },
+  "require": {
+    "php": "^8.2",
+    "statamic/cms": "^6.0"
+  },
+  "require-dev": {
+    "larastan/larastan": "^3.0",
+    "laravel/pint": "^1.18",
+    "orchestra/testbench": "^10.0|^11.0",
+    "phpunit/phpunit": "^11.0|^12.0"
+  },
+  "config": {
+    "optimize-autoloader": true,
+    "preferred-install": "dist",
+    "sort-packages": true,
+    "allow-plugins": true
+  },
+  "scripts": {
+    "test": [
+      "php -d memory_limit=-1 -d max_execution_time=0 ./vendor/bin/phpunit"
+    ],
+    "lint": [
+      "./vendor/bin/pint --test"
+    ],
+    "fix": [
+      "./vendor/bin/pint"
+    ],
+    "analyse": [
+      "./vendor/bin/phpstan analyse"
+    ]
+  }
+}

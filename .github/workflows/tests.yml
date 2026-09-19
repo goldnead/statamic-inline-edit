@@ -1,0 +1,114 @@
+name: Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions: {}
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        php: ['8.2', '8.3', '8.4']
+        # Statamic 6 requires laravel/framework ^12.40 || ^13.0, so an ^11.0 leg
+        # can never resolve. The studio template still carries it; this matrix
+        # matches what composer.json actually promises.
+        laravel: ['^12.0', '^13.0']
+        stability: [prefer-lowest, prefer-stable]
+        exclude:
+          # Laravel 13 requires PHP ^8.3.
+          - php: '8.2'
+            laravel: '^13.0'
+
+    name: PHP ${{ matrix.php }} · Laravel ${{ matrix.laravel }} · ${{ matrix.stability }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+          extensions: dom, curl, libxml, mbstring, zip, pcntl, intl, fileinfo
+          coverage: none
+
+      - name: Install dependencies
+        run: |
+          composer require "laravel/framework:${{ matrix.laravel }}" --no-interaction --no-update
+          composer update --${{ matrix.stability }} --prefer-dist --no-interaction
+
+      - name: Run tests
+        run: vendor/bin/phpunit
+
+  lint:
+    runs-on: ubuntu-latest
+    name: Code style
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          coverage: none
+
+      - run: composer install --prefer-dist --no-interaction
+
+      # Check, never fix. Auto-committing style fixes onto a contributor's
+      # branch rewrites their work without asking.
+      - run: vendor/bin/pint --test
+
+  browser:
+    runs-on: ubuntu-latest
+    name: Browser behaviour
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      # playwright-core drives a browser, it does not ship one. The runner
+      # already has Chrome installed; using it keeps this job under a minute
+      # and avoids a 300 MB download for five hundred lines of DOM work.
+      - run: npm install --no-audit --no-fund
+
+      - run: node tests/browser/run.mjs
+        env:
+          CHROME_PATH: /usr/bin/google-chrome
+
+  standards:
+    runs-on: ubuntu-latest
+    name: Addon standards
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: addon
+          # release.versioning reads the repository's tags. actions/checkout
+          # fetches none by default, so without this the rule reports a tagged
+          # release as untagged.
+          fetch-depth: 0
+
+      - uses: actions/checkout@v4
+        with:
+          repository: goldnead/statamic-addon-studio
+          path: studio
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          coverage: none
+
+      - name: Run addon-lint
+        run: php studio/tools/addon-lint/bin/addon-lint addon --no-color --fail-on=major -v
+
+# There is no assets job on purpose. resources/dist is hand-written vanilla
+# JavaScript and CSS with no build step, so there is no generated artefact that
+# could drift from a source. See the header of resources/dist/inline-edit.js.
