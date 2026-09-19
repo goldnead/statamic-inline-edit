@@ -423,9 +423,16 @@ check(
     'otherwise a flipped toggle looks exactly like an untouched one'
 );
 
-await page.locator('.sie-pop-done').click();
-check('the control closes', await popover.isHidden());
+// The close is deferred a tick, so that a native select can finish putting
+// its own dropdown away before the panel under it disappears.
+await page.waitForTimeout(120);
+check(
+    'answering it closes it, with nothing left to press',
+    await popover.isHidden(),
+    'one control, one decision: a Done button after the deciding click had nothing to do'
+);
 check('and the change survives closing it', (await count.textContent()) === '1 unsaved');
+check('so there is no Done button on a single control', (await page.locator('.sie-pop-done').count()) === 0);
 
 console.log('\na select');
 
@@ -440,10 +447,83 @@ check(
     'the reset strips the chevron, and what is left reads as a text field'
 );
 
+// `appearance: auto` hands back the chevron and nothing else. The box is
+// ours to draw, and without it the control at rest is a word floating in
+// white on a white card, with the focus ring as its only edge. The earlier
+// version of this check asked only about `appearance` and passed while the
+// border was missing.
+check(
+    'and it has an edge of its own, not just a focus ring',
+    (await page.locator('.sie-pop select').evaluate((el) => getComputedStyle(el).boxShadow)).includes('inset'),
+    await page.locator('.sie-pop select').evaluate((el) => getComputedStyle(el).boxShadow)
+);
+
+// Measured against the toolbar rather than against a remembered colour: the
+// two are meant to be the same object seen twice, and a check that only
+// compares white to white would pass on any light panel at all.
+const popSkin = await popover.evaluate((el) => {
+    const s = getComputedStyle(el);
+    return [s.backgroundColor, s.borderRadius, s.boxShadow].join(' | ');
+});
+const bubbleSkin = await page.evaluate(() => {
+    const el = document.createElement('div');
+    el.className = 'sie-bubble';
+    document.body.appendChild(el);
+    const s = getComputedStyle(el);
+    const out = [s.backgroundColor, s.borderRadius, s.boxShadow].join(' | ');
+    el.remove();
+    return out;
+});
+check('and the panel wears the same skin as the selection toolbar', popSkin === bubbleSkin, popSkin + '  vs  ' + bubbleSkin);
+
+// Reading down the list with the keyboard. A closed select fires `change`
+// on every arrow key, so a panel that closes on `change` shut itself after
+// one keystroke and committed whatever happened to be next. The value moving
+// is native behaviour and stays; taking the panel away is what was wrong.
+await page.locator('.sie-pop select').focus();
+await page.keyboard.press('ArrowDown');
+await page.waitForTimeout(120);
+check(
+    'arrowing through the list does not close it',
+    await popover.isVisible(),
+    'a keyboard answer is not finished until Enter'
+);
+check('though the value does move, as a native select does', (await select2.getAttribute('data-sie-ghost')) === 'Ausgebucht');
+await page.keyboard.press('Enter');
+await page.waitForTimeout(120);
+check('and Enter is what finishes it', await popover.isHidden());
+
+await select2.dblclick();
 await page.locator('.sie-pop select').selectOption('voll');
-check('picking another counts', (await count.textContent()) === '2 unsaved');
+check('picking with the pointer counts', (await count.textContent()) === '2 unsaved');
 check('and names the choice on the page', (await select2.getAttribute('data-sie-ghost')) === 'Ausgebucht');
-await page.keyboard.press('Escape');
+await page.waitForTimeout(120);
+check('and picking closes it too', await popover.isHidden());
+
+console.log('\na date');
+
+// The date field shares the two lines that decide when the panel closes, and
+// until this block existed only the select half of them was covered.
+const date2 = page.locator('[data-sie-field="starts_on"]');
+await date2.dblclick();
+check('opens a real date input', (await page.locator('.sie-pop input[type="date"]').count()) === 1);
+check('with the stored day in it', (await page.locator('.sie-pop input[type="date"]').inputValue()) === '2026-10-04');
+check(
+    'and an edge of its own, like the select',
+    (await page.locator('.sie-pop input[type="date"]').evaluate((el) => getComputedStyle(el).boxShadow)).includes('inset')
+);
+
+// Typed, not filled. `fill()` sets the value programmatically and fires no
+// keydown, so the panel would rightly read it as a pointer answer. This is
+// the branch that broke for the select: a keystroke must not commit-and-close.
+await page.locator('.sie-pop input[type="date"]').focus();
+await page.keyboard.type('11152026');
+await page.waitForTimeout(150);
+check('typing a day does not close it', await popover.isVisible(), 'a keyboard answer waits for Enter here too');
+check('but it is already recorded', (await date2.getAttribute('data-sie-ghost')) === '2026-11-15', await date2.getAttribute('data-sie-ghost'));
+await page.keyboard.press('Enter');
+await page.waitForTimeout(150);
+check('and Enter finishes it', await popover.isHidden());
 
 console.log('\nmarkdown');
 
@@ -485,9 +565,9 @@ check(
     'otherwise the page keeps the old rendering until after the save'
 );
 
-check('three changes are now pending', (await count.textContent()) === '3 unsaved');
+check('four changes are now pending', (await count.textContent()) === '4 unsaved');
 
-console.log('\nsaving the three of them');
+console.log('\nsaving the four of them');
 
 reply = { status: 200, body: { saved: [{ id: 'entry-1', stamp: '1700010000' }] } };
 lastRequest = null;
@@ -504,6 +584,7 @@ const sent = lastRequest.body.changes.find((c) => c.id === 'entry-1').fields;
 check('a toggle travels as a real boolean', sent.promoted === false, JSON.stringify(sent.promoted));
 check('a select travels as the chosen key', sent.belegung === 'voll', JSON.stringify(sent.belegung));
 check('markdown travels as its source', sent.body.startsWith('## **Ein Kapitel**'), JSON.stringify(sent.body));
+check('a date travels as a plain day', sent.starts_on === '2026-11-15', JSON.stringify(sent.starts_on));
 
 console.log('\nthe control panel overlay');
 

@@ -518,44 +518,64 @@
     font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
 }
 
+/* Light, and the same light as the selection toolbar.
+ *
+ * It used to be a dark pill, which was the bar's colour back when the bar was
+ * the only chrome this addon had. Since the toolbar went light it read as a
+ * third design: a black slab dropped on a white page, wide enough to cover
+ * the row it was editing, with a native select sitting in it looking
+ * borrowed. The rule now is that anything docked is dark and anything
+ * floating over the content is a light panel, which is also what the control
+ * panel this addon sits next to does.
+ *
+ * Fixed, not absolute: on a real client page something up the tree has
+ * `overflow: hidden` sooner or later, and an absolutely positioned popover
+ * gets clipped by it with no warning. */
 .sie-pop {
     position: fixed;
     z-index: 2147483001;
     display: flex;
-    align-items: center;
-    gap: 10px;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 5px;
     max-width: calc(100vw - 16px);
-    padding: 10px;
-    border-radius: 10px;
-    background: #16181d;
-    color: #f4f5f7;
-    box-shadow: 0 10px 34px rgb(0 0 0 / 38%), 0 0 0 1px rgb(255 255 255 / 10%) inset;
+    padding: 8px;
+    border-radius: 8px;
+    background: #fff;
+    color: #14171c;
+    box-shadow:
+        0 0 0 1px rgb(17 24 39 / 8%),
+        0 6px 18px rgb(17 24 39 / 14%),
+        0 1px 2px rgb(17 24 39 / 8%);
     font-size: 13px;
     line-height: 1.4;
 }
 
 .sie-pop[hidden] { display: none; }
 
+/* A column, like the small panel, and for the same reason: every child here
+   is full width. It used to be a two-track grid whose second track nothing
+   ever occupied, because all four children carried `grid-column: 1 / -1`. */
 .sie-pop-wide {
-    display: grid;
-    grid-template-columns: 1fr auto;
-    gap: 8px;
     width: min(680px, calc(100vw - 16px));
+    gap: 8px;
 }
 
-.sie-pop-wide .sie-pop-label { grid-column: 1 / -1; }
-.sie-pop-wide .sie-tools { grid-column: 1 / -1; }
-.sie-pop-wide .sie-area { grid-column: 1 / -1; }
+/* The one child that is not full width. Stretched it reads like a second
+   text field rather than the end of the form. */
+.sie-pop-wide .sie-pop-done { align-self: flex-end; }
 
-/* Its own row, at the end of it. Left in the first track it stretches across
-   the whole editor and reads like a second text field. */
-.sie-pop-wide .sie-pop-done {
-    grid-column: 1 / -1;
-    justify-self: end;
-}
-
+/* Above the control, not beside it. Beside it, the field name sat on the same
+   line as the value and read like a second label for a column that already
+   has one, and it pushed the panel wide enough to cover the neighbouring
+   fields. */
 .sie-pop .sie-pop-label {
-    opacity: 0.65;
+    padding: 0 2px;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    color: #6b7280;
     white-space: nowrap;
 }
 
@@ -563,13 +583,25 @@
    calendar button, and what is left is a white rectangle with a word in it.
    The editor then cannot tell it is a list, or that typing will not work.
    Handed back explicitly. */
+/* The hairline is not decoration. `all: unset` takes the control's border
+   away along with everything else, and `appearance: auto` hands back only the
+   chevron and the calendar button, not the box. Without this the select at
+   rest is a word floating in white on a white card, and the only edge it ever
+   has is the focus ring, which is also why the panel opened looking
+   accent-heavy.
+
+   14 percent here where the switch and the source box use 10: those two sit
+   on a grey fill that carries half the edge already, this one sits on white
+   and has to do all of it. Matched by eye at the same apparent weight, not
+   by copying the number. */
 .sie-pop .sie-input {
-    min-height: 40px;
-    min-width: 10rem;
-    padding: 0 10px;
+    min-height: 34px;
+    min-width: 11rem;
+    padding: 0 8px;
     border-radius: 6px;
-    background: #f4f5f7;
-    color: #16181d;
+    background: #fff;
+    color: #14171c;
+    box-shadow: inset 0 0 0 1px rgb(17 24 39 / 14%);
     font-size: 14px;
     cursor: pointer;
     appearance: auto;
@@ -579,34 +611,45 @@
 .sie-pop select.sie-input { padding-right: 4px; }
 
 .sie-pop .sie-switch {
-    min-height: 40px;
-    min-width: 5.5rem;
-    padding: 0 14px;
+    min-height: 34px;
+    min-width: 6rem;
+    padding: 0 12px;
     border-radius: 6px;
-    background: rgb(255 255 255 / 12%);
+    background: #f1f3f6;
+    color: #3f4451;
+    box-shadow: inset 0 0 0 1px rgb(17 24 39 / 10%);
     text-align: center;
     cursor: pointer;
     font-weight: 500;
+    font-size: 14px;
 }
+
+.sie-pop .sie-switch:hover { background: #e9ecf1; }
 
 .sie-pop .sie-switch[aria-pressed="true"] {
-    background: #3b82f6;
+    background: #2f6fe4;
     color: #fff;
+    box-shadow: none;
 }
 
+/* Only the wide markdown editor still has one. A single control closes
+   itself the moment it is answered, so a button that says "done" after the
+   deciding click had nothing left to do. */
 .sie-pop .sie-pop-done {
-    min-height: 40px;
+    min-height: 34px;
     padding: 0 14px;
     border-radius: 6px;
-    background: rgb(255 255 255 / 12%);
+    background: #2f6fe4;
+    color: #fff;
+    font-weight: 500;
     cursor: pointer;
     white-space: nowrap;
 }
 
-.sie-pop .sie-pop-done:hover { background: rgb(255 255 255 / 22%); }
+.sie-pop .sie-pop-done:hover { background: #2760cc; }
 
 .sie-pop :focus-visible {
-    outline: 2px solid #60a5fa;
+    outline: 2px solid #2f6fe4;
     outline-offset: 2px;
 }
 
@@ -617,19 +660,24 @@
     gap: 6px;
 }
 
+/* The same chip as the toggle switch, because that is what it is: grey fill,
+   6px, one hairline. It had 5px and no edge, which read as a third kind of
+   button in a panel that only has two. */
 .sie-pop .sie-tool {
     padding: 0 10px;
     min-height: 34px;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    border-radius: 5px;
-    background: rgb(255 255 255 / 10%);
+    border-radius: 6px;
+    background: #f1f3f6;
+    color: #3f4451;
+    box-shadow: inset 0 0 0 1px rgb(17 24 39 / 10%);
     cursor: pointer;
     font-weight: 600;
 }
 
-.sie-pop .sie-tool:hover { background: rgb(255 255 255 / 20%); }
+.sie-pop .sie-tool:hover { background: #e4e8ee; }
 
 .sie-pop .sie-area {
     display: block;
@@ -637,8 +685,9 @@
     min-height: 38vh;
     padding: 10px 12px;
     border-radius: 6px;
-    background: #0f1115;
-    color: #e8eaee;
+    background: #f6f7f9;
+    color: #14171c;
+    box-shadow: inset 0 0 0 1px rgb(17 24 39 / 10%);
     /* Monospace on purpose: this is the markdown source, not the page, and
        it should not pretend to be a preview of it. */
     font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;

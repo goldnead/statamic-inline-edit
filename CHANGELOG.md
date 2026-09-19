@@ -1,5 +1,51 @@
 # Changelog
 
+## 1.3.0
+
+### The control panel for a toggle, a select or a date is a light panel now
+
+Adrian pointed at a screenshot: a dark pill lying across the table row it was editing,
+holding the words "Belegung ·", a native select and a button marked Done. Roughly 660 by 110
+pixels to change one word.
+
+It is 192 by 69 now, 18 percent of the area, and it wears the same skin as the selection
+toolbar: white, 8px, the same three shadows. The rule this settles is that anything docked
+stays dark and anything floating over the content is a light panel, which is also what the
+control panel next door does. The field name moved above the control as a small caps line, so
+the panel is no longer wide enough to cover the row it serves.
+
+**The Done button is gone from a single control.** By the time anybody could press it the
+answer was already recorded and already showing on the page, and Escape and a click outside
+both already closed the panel without changing anything. One control, one decision, and the
+decision closes it. The wide markdown editor keeps its button, because a text field has no
+event that means "finished".
+
+### Three bugs that came out of the review, one of them real
+
+- **An arrow key committed the wrong value and took the panel away.** A closed `<select>`
+  fires `change` on every arrow key, which is native and correct; closing on it was not.
+  Somebody reading down the list with the keyboard got one keystroke and then a shut panel
+  with the neighbouring value set. The panel now knows which hand answered: a pointer closes
+  it, a keyboard waits for Enter. The old test used `selectOption()`, which goes straight past
+  the keyboard path, so it stayed green through all of it.
+- **The select and the date had no edge of their own.** `all: unset` takes the border with
+  everything else, and `appearance: auto` hands back the chevron but not the box. At rest the
+  control was a word floating in white on a white card, with the focus ring as its only
+  outline. Nothing showed it, because the panel focuses the control the moment it opens.
+- **`"Text · "`.** The separator was printed whether or not anything followed it. Fixed in the
+  small panel first and left standing in the wide one, which is exactly the shape of mistake
+  the small panel's comment describes.
+
+Two checks were claiming more than they measured. "Still looks like a dropdown" only asked
+about `appearance` and passed while the border was missing; "light, like the selection
+toolbar" compared white to white. The first now asserts the inset edge, the second builds a
+real `.sie-bubble` and compares background, radius and shadow against it.
+
+The fixture grew a date field. Both control branches share the two lines that decide when the
+panel closes, and only one of them was covered.
+
+35 PHP tests, 127 browser checks.
+
 ## 1.2.0
 
 ### Markdown is edited in place now, not in a box

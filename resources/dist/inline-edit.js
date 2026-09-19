@@ -409,12 +409,58 @@
         // out what they just opened.
         var label = document.createElement('span');
         label.className = 'sie-pop-label';
-        label.textContent = (node.dataset.sieLabel || node.dataset.sieField)
-            + ' · ' + (node.dataset.sieBadge || '');
+        // The separator only when there is something on the other side of it.
+        // A field with no kind badge used to read "BELEGUNG ·", which looks
+        // like the sentence was cut off.
+        label.textContent = [node.dataset.sieLabel || node.dataset.sieField, node.dataset.sieBadge]
+            .filter(Boolean)
+            .join(' · ');
         pop.appendChild(label);
 
         var current = valueOf(node) === read(node) ? (node.dataset.sieRaw || '') : valueOf(node);
         var input;
+
+        // One control, one decision, and the decision closes it. There used
+        // to be a "Done" button here, and by the time anybody could press it
+        // the answer was already pending and already showing on the page, so
+        // it was a second click that did nothing but take the panel away.
+        // Escape and a click outside still do that without changing anything.
+        //
+        // Deferred a tick: a `change` from a native select fires while the
+        // browser is still closing its own dropdown, and tearing the panel
+        // out from under it leaves the list painted on some platforms.
+        function answered() {
+            window.setTimeout(function () {
+                if (popFor === node) closePop();
+            }, 0);
+        }
+
+        // Which hand answered, because the two mean different things.
+        //
+        // A closed `<select>` fires `change` on every arrow key. That is
+        // native behaviour and the value really does change, so it is right
+        // to record it. Closing on it is not: somebody reading down the list
+        // with the keyboard had the panel taken away after one keystroke,
+        // with the neighbouring value committed. Measured, not guessed.
+        //
+        // So a pointer answer closes, and a keyboard one waits for Enter.
+        var byKeyboard = false;
+
+        function watchModality(el) {
+            el.addEventListener('pointerdown', function () { byKeyboard = false; });
+            el.addEventListener('keydown', function (event) {
+                byKeyboard = true;
+
+                if (event.key === 'Enter') {
+                    event.preventDefault();
+                    answered();
+                }
+            });
+        }
+
+        function committed() {
+            if (!byKeyboard) answered();
+        }
 
         if (node.dataset.sieType === 'toggle') {
             input = document.createElement('button');
@@ -428,6 +474,7 @@
                 input.setAttribute('aria-pressed', on ? 'true' : 'false');
                 input.textContent = on ? (L.on || 'An') : (L.off || 'Aus');
                 setPending(node, on, on ? (L.on || 'An') : (L.off || 'Aus'));
+                answered();
             });
         } else if (node.dataset.sieType === 'select') {
             input = document.createElement('select');
@@ -455,8 +502,10 @@
             });
 
             input.value = current;
+            watchModality(input);
             input.addEventListener('change', function () {
                 setPending(node, input.value, input.options[input.selectedIndex].textContent);
+                committed();
             });
         } else {
             input = document.createElement('input');
@@ -464,17 +513,14 @@
             input.type = 'date';
             // A stored date can carry a time; the input only takes the day.
             input.value = (current || '').slice(0, 10);
-            input.addEventListener('change', function () { setPending(node, input.value, input.value); });
+            watchModality(input);
+            input.addEventListener('change', function () {
+                setPending(node, input.value, input.value);
+                committed();
+            });
         }
 
         pop.appendChild(input);
-
-        var done = document.createElement('button');
-        done.type = 'button';
-        done.className = 'sie-pop-done';
-        done.textContent = L.done || 'Fertig';
-        done.addEventListener('click', closePop);
-        pop.appendChild(done);
 
         placePop(node);
         input.focus();
@@ -593,8 +639,12 @@
 
         var head = document.createElement('span');
         head.className = 'sie-pop-label';
-        head.textContent = (node.dataset.sieLabel || node.dataset.sieField)
-            + ' · ' + (node.dataset.sieBadge || '');
+        // Same as the small panel: the separator only when there is a second
+        // half. A field with no kind badge read "Text · ", which looks like
+        // the sentence was cut off.
+        head.textContent = [node.dataset.sieLabel || node.dataset.sieField, node.dataset.sieBadge]
+            .filter(Boolean)
+            .join(' · ');
         pop.appendChild(head);
 
         var tools = document.createElement('div');
