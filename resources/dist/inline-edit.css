@@ -887,6 +887,37 @@
     background: #fff;
 }
 
+/* One field rather than the whole entry form, so: the size of the field.
+   A full screen for a single paragraph was the complaint this answers.
+
+   The height comes from the form itself, over postMessage, because a Bard
+   grows as it is typed into. Until the first message arrives the fallback
+   below keeps the panel a sensible size instead of a sliver. */
+.sie-panel.sie-panel-card {
+    inset: auto;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: min(760px, calc(100vw - 32px));
+    max-height: calc(100vh - 32px);
+    border-radius: 10px;
+    overflow: hidden;
+    box-shadow: 0 24px 60px rgb(0 0 0 / 35%);
+}
+
+/* No title bar on the card. The form inside carries the field's own label and
+   its own Close, and a second heading in a second style over the top of them
+   was the full-screen overlay's chrome turning up where it is not needed. */
+.sie-panel.sie-panel-card .sie-panel-bar { display: none; }
+
+.sie-panel.sie-panel-card .sie-frame {
+    flex: none;
+    height: var(--sie-frame-height, 420px);
+    /* Whatever the form says, it never grows past the window. Past that
+       point the frame scrolls, which is the browser's job and not ours. */
+    max-height: calc(100vh - 32px);
+}
+
 /* While the server is rendering the preview. Brief, and only ever on a
    markdown block that was just closed. */
 .sie-previewing { opacity: 0.55; }

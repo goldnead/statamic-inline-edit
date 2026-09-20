@@ -158,13 +158,16 @@ return [
     |
     | What to do with a marked field that none of the lists above covers: a
     | Bard, a Replicator, an image, a Grid. With this on, double-clicking it
-    | opens that entry's control panel form in an overlay on the same page.
+    | opens a panel over the page holding that one field.
     |
-    | Deliberately the real control panel in an iframe, not a rebuilt editor.
-    | Bard alone is a whole editor, an asset picker is a whole browser, and a
-    | second-rate copy of either is worse than one click into the real one.
-    | Saving there goes through the control panel's own validation, revisions
-    | and permissions, and the page reloads when the overlay closes.
+    | Deliberately the real control panel field in an iframe, not a rebuilt
+    | editor. Bard alone is a whole editor, an asset picker is a whole browser,
+    | and a second-rate copy of either is worse than the real one. Saving goes
+    | through the blueprint's own validation and permissions, and the page
+    | reloads when the panel closes.
+    |
+    | On a collection with revisions the whole entry form opens instead: one
+    | field written past a working copy would publish straight to the site.
     |
     | Switch it off if your control panel sits behind a proxy that refuses to
     | be framed, or on another domain. Those fields then simply render

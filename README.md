@@ -113,7 +113,7 @@ fieldtype, in `config/statamic-inline-edit.php`.
 | **text** | `text`, `textarea`, `integer` | The text itself opens. What you type is what the page will show. |
 | **control** | `toggle`, `select`, `date` | A small control opens. The value is not the text on the page, so there is nothing to put a cursor in. |
 | **source** | `markdown` | The text becomes a real editor, in place. Markdown shortcuts as you type, a toolbar over the selection. |
-| **cp** | everything else | That entry's control panel form opens in an overlay. |
+| **cp** | everything else | That one field opens as a control panel publish form, in a panel over the page. |
 
 Only **text** keeps what you typed on the page as you typed it. The other three reload the page
 after saving, because only the server knows what the template will make of the new value.
@@ -151,11 +151,15 @@ comparison is against what the editor produced on mount rather than against what
 But if you have markdown that has to come back byte for byte, hand-written tables, HTML blocks,
 footnotes, set `rich` to `false` and you get the plain source editor instead.
 
-**cp** is the real control panel in an iframe, not a rebuilt editor. Bard alone is an entire
-editor and an asset picker is an entire browser; a second-rate copy of either is worse than one
-click into the real one. Saving there goes through the control panel's own validation,
-revisions and permissions. The overlay scrolls to the field you double-clicked and outlines it,
-and the page reloads when you close it.
+**cp** is the real control panel field in an iframe, not a rebuilt editor. Bard alone is an
+entire editor and an asset picker is an entire browser; a second-rate copy of either is worse
+than the real one. What opens is a panel holding **that one field** and nothing else — the
+real fieldtype, its real metadata, its whole toolbar — and saving runs through the blueprint's
+own validation and permissions. The page reloads when you close it.
+
+Entries on a collection with **revisions** are the exception: writing one field past a working
+copy would publish straight to the site. Those open the whole entry form instead, which knows
+how to make one, and they open scrolled to the field you double-clicked.
 
 ### Seeing it before you save it
 

@@ -35,7 +35,7 @@ class SaveController extends Controller
      * reachable through the control panel, where the consequence is visible.
      * None of them is a small text change.
      */
-    protected const FORBIDDEN = ['id', 'slug', 'published', 'blueprint', 'date', 'author', 'parent'];
+    public const FORBIDDEN = ['id', 'slug', 'published', 'blueprint', 'date', 'author', 'parent'];
 
     public function __invoke(Request $request): JsonResponse
     {

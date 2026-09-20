@@ -179,6 +179,14 @@ class Editable extends Tags
         // would send half the installations to a 404.
         if ($mode === 'cp' && ($url = $this->panelUrl($entry))) {
             $attributes['data-sie-cp'] = $url;
+
+            // And, where it is possible, the one field on its own. The full
+            // form stays on the element as the fallback: it is what an entry
+            // under revisions still gets, and what the browser falls back to
+            // if this route is missing from an older published copy.
+            if ($fieldUrl = $this->fieldUrl($entry, $value->handle() ?: $field)) {
+                $attributes['data-sie-field-url'] = $fieldUrl;
+            }
         }
 
         // The field's own label from the blueprint, for the placeholder an
@@ -235,6 +243,35 @@ class Editable extends Tags
         return route('statamic.cp.collections.entries.edit', [
             'collection' => $entry->collectionHandle(),
             'entry' => $entry->id(),
+        ]);
+    }
+
+    /**
+     * Where this one field is edited on its own.
+     *
+     * Null when the entry uses revisions: saving one field there would write
+     * straight past the person who is meant to approve it, and making a
+     * working copy properly is the control panel's own job. Those entries
+     * keep opening the whole form, which knows how.
+     */
+    protected function fieldUrl(mixed $entry, string $handle): ?string
+    {
+        if (! is_object($entry) || ! method_exists($entry, 'collectionHandle')) {
+            return null;
+        }
+
+        if (! Route::has('statamic.cp.inline-edit.field.edit')) {
+            return null;
+        }
+
+        if (method_exists($entry, 'revisionsEnabled') && $entry->revisionsEnabled()) {
+            return null;
+        }
+
+        return route('statamic.cp.inline-edit.field.edit', [
+            'collection' => $entry->collectionHandle(),
+            'entry' => $entry->id(),
+            'handle' => $handle,
         ]);
     }
 

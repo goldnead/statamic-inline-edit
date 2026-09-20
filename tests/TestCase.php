@@ -56,6 +56,10 @@ abstract class TestCase extends AddonTestCase
             'belegung' => ['type' => 'select', 'options' => ['offen' => 'Offen', 'voll' => 'Ausgebucht']],
             'starts_on' => ['type' => 'date'],
             'body' => ['type' => 'markdown'],
+            // The reason the one-field control panel panel exists: a whole
+            // editor, which this addon does not rebuild and does not want to
+            // hand over a whole entry form for.
+            'inhalt' => ['type' => 'bard', 'display' => 'Inhalt'],
             'hero' => ['type' => 'assets', 'max_files' => 1],
         ])->setHandle($handle)->setNamespace('collections.'.$handle);
 

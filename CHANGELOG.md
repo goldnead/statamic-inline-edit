@@ -1,5 +1,32 @@
 # Changelog
 
+## Unreleased
+
+### A Bard opens as a Bard, not as the whole entry form
+
+Adrian, at the end of a session: "Ich fände es eleganter wenn man nur das bard Textfeld hat
+und nicht das ganze Statamic Input Feld als popup."
+
+He was right. Double-clicking a paragraph handed back the entire control panel page in a
+full-screen frame: a sidebar, a revision history, a publish state and nineteen other fields,
+for one edit to one text. The frame was the size of the screen because its contents were the
+size of a back office.
+
+There is now a control panel route that renders **one field** as a real publish form —
+`/cp/inline-edit/field/{collection}/{entry}/{handle}` — and the overlay opens that instead.
+The field is the real fieldtype with its real metadata, so a Bard arrives with its whole
+toolbar, its sets and its link browser, and saving runs through the blueprint's own
+validation. The panel is a card the size of the field, which the form measures and reports,
+rather than a black rectangle over the page.
+
+**Entries under revisions keep the old behaviour.** Writing one field past a working copy
+would publish straight to the site on a collection whose whole point is that somebody
+approves first. Those still open the full form, which knows how to make one. The tag does not
+offer the new route for them, and the route refuses them a second time.
+
+This adds a small control panel bundle to the addon, published with
+`php artisan vendor:publish --tag=statamic-inline-edit`.
+
 ## 1.3.0
 
 ### The control panel for a toggle, a select or a date is a light panel now

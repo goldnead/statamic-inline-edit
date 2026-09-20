@@ -756,7 +756,12 @@
      * validation, revisions and permissions.
      */
     function openPanel(node) {
-        var url = node.dataset.sieCp;
+        // The one field on its own where the control panel offers it, the
+        // whole entry form otherwise. A Bard that arrives surrounded by
+        // nineteen other fields, a sidebar and a revision history is not what
+        // anybody double-clicked a paragraph for.
+        var single = node.dataset.sieFieldUrl;
+        var url = single || node.dataset.sieCp;
 
         if (!url) return;
 
@@ -765,15 +770,28 @@
         panelTitle.textContent = node.dataset.sieLabel || node.dataset.sieField;
         frame.title = panelTitle.textContent;
         frame.dataset.sieField = node.dataset.sieField || '';
+        frame.dataset.sieSingle = single ? 'true' : '';
         frame.src = url;
+
+        // Starts at a readable size and is corrected the moment the form
+        // reports its own height, so the panel never flashes at full screen
+        // on the way to being small.
+        panel.classList.toggle('sie-panel-card', !!single);
+        panel.style.removeProperty('--sie-frame-height');
+
         panel.hidden = false;
         document.documentElement.classList.add('sie-panel-open');
-        panelClose.focus();
+
+        // The card has no title bar to put focus on, so focus goes into the
+        // form itself. Without this the keyboard is left behind on the page
+        // underneath, which is the page this thing is covering.
+        if (single) frame.focus(); else panelClose.focus();
     }
 
     function closePanel() {
         panel.hidden = true;
         frame.removeAttribute('src');
+        frame.dataset.sieSingle = '';
         document.documentElement.classList.remove('sie-panel-open');
 
         // Whatever happened in there happened to the entry, not to this page.
@@ -781,6 +799,33 @@
         // way to find out that nothing happened.
         window.location.reload();
     }
+
+    /**
+     * What the one-field form has to say: how tall it is, and that it is done.
+     *
+     * The frame is same-origin, so its height could be read from here instead.
+     * It is not, because `load` fires long before a Vue form has mounted and
+     * long before a Bard has grown to fit its text: the frame tells us when
+     * something changed, rather than us guessing when to look.
+     *
+     * The only check that matters is that the message came from this frame.
+     * Anything else on the page may post to `window` all day.
+     */
+    window.addEventListener('message', function (event) {
+        if (!frame.contentWindow || event.source !== frame.contentWindow) return;
+
+        var data = event.data;
+
+        if (!data || data.source !== 'statamic-inline-edit') return;
+
+        if (data.type === 'height' && frame.dataset.sieSingle) {
+            panel.style.setProperty('--sie-frame-height', Math.max(120, data.height | 0) + 'px');
+
+            return;
+        }
+
+        if (data.type === 'saved' || data.type === 'close') closePanel();
+    });
 
     panelClose.addEventListener('click', closePanel);
 
@@ -800,6 +845,9 @@
         var handle = frame.dataset.sieField;
 
         if (!handle) return;
+
+        // Nothing to hunt for on the one-field page: it is the field.
+        if (frame.dataset.sieSingle) return;
 
         // `load` is not the moment the form exists.
         //

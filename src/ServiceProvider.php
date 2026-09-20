@@ -44,6 +44,26 @@ class ServiceProvider extends AddonServiceProvider
     {
         $this->loadTranslationsFrom(__DIR__.'/../lang', 'statamic-inline-edit');
 
+        // The control panel bundle: one Inertia page, which renders a single
+        // field as a publish form for the overlay on the public page. Loaded
+        // on every CP page, because that is how Statamic registers addon
+        // assets; it is a few kilobytes, since Vue and the CP's own component
+        // library stay with the host.
+        //
+        // Registered here rather than through the `$vite` property, whose
+        // declared type in core is a plain list of entry points and will not
+        // carry the directory this build actually writes to.
+        //
+        // Publish it, or the control panel cannot find the manifest and every
+        // CP page dies on it:
+        // `php artisan vendor:publish --tag=statamic-inline-edit`. That is the
+        // addon slug, registered by core for this bundle, and a different tag
+        // from `statamic-inline-edit-assets` below.
+        $this->registerVite([
+            'input' => ['resources/js/cp.js'],
+            'publicDirectory' => 'resources/dist',
+        ]);
+
         $this->publishes([
             __DIR__.'/../config/statamic-inline-edit.php' => config_path('statamic-inline-edit.php'),
         ], 'statamic-inline-edit-config');
