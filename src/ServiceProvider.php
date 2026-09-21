@@ -21,6 +21,27 @@ class ServiceProvider extends AddonServiceProvider
     ];
 
     /**
+     * The control panel bundle: one Inertia page, which renders a single field
+     * as a publish form for the panel on the public page. Loaded on every CP
+     * page, because that is how Statamic registers addon assets; it stays a
+     * few kilobytes, since Vue and the CP's component library are the host's.
+     *
+     * A plain list of entry points, which is the shape core declares and the
+     * only shape its own type allows. That fixes the build directory at
+     * `public/build`, so vite.config.js writes there.
+     *
+     * Publish it, or the control panel cannot find the manifest and every CP
+     * page dies on it: `php artisan vendor:publish --tag=statamic-inline-edit`.
+     * That is the addon slug, which core registers for this bundle, and a
+     * different tag from `statamic-inline-edit-assets` below.
+     *
+     * @var list<string>
+     */
+    protected $vite = [
+        'resources/js/cp.js',
+    ];
+
+    /**
      * The parent boots config off the addon directory, which is resolved
      * through the manifest and comes up empty in package test suites. Merged
      * explicitly in register() with an absolute path instead.
@@ -43,26 +64,6 @@ class ServiceProvider extends AddonServiceProvider
     public function bootAddon()
     {
         $this->loadTranslationsFrom(__DIR__.'/../lang', 'statamic-inline-edit');
-
-        // The control panel bundle: one Inertia page, which renders a single
-        // field as a publish form for the overlay on the public page. Loaded
-        // on every CP page, because that is how Statamic registers addon
-        // assets; it is a few kilobytes, since Vue and the CP's own component
-        // library stay with the host.
-        //
-        // Registered here rather than through the `$vite` property, whose
-        // declared type in core is a plain list of entry points and will not
-        // carry the directory this build actually writes to.
-        //
-        // Publish it, or the control panel cannot find the manifest and every
-        // CP page dies on it:
-        // `php artisan vendor:publish --tag=statamic-inline-edit`. That is the
-        // addon slug, registered by core for this bundle, and a different tag
-        // from `statamic-inline-edit-assets` below.
-        $this->registerVite([
-            'input' => ['resources/js/cp.js'],
-            'publicDirectory' => 'resources/dist',
-        ]);
 
         $this->publishes([
             __DIR__.'/../config/statamic-inline-edit.php' => config_path('statamic-inline-edit.php'),

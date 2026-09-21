@@ -1,7 +1,9 @@
 <script setup>
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue';
 import {
+    Alert,
     Button,
+    CommandPaletteItem,
     PublishContainer,
     PublishFieldsProvider,
     PublishFields,
@@ -169,17 +171,29 @@ onBeforeUnmount(() => {
             </PublishFieldsProvider>
         </PublishContainer>
 
-        <p v-if="failed" class="sie-cp-failed" v-text="failed"></p>
+        <!-- Core's own alert rather than a paragraph of ours: it is the shape
+             a control panel uses to say something went wrong, and it carries
+             the theme's colours instead of a red this addon picked. -->
+        <Alert v-if="failed" variant="error" class="mt-3">
+            <p v-text="failed"></p>
+        </Alert>
 
         <div class="sie-cp-actions">
             <Button variant="ghost" :text="labels?.close" @click="tell('close')" />
-            <Button
+            <CommandPaletteItem
                 v-if="! readOnly"
-                variant="primary"
-                :disabled="saving"
-                :text="saving ? labels?.saving : labels?.save"
-                @click="save"
-            />
+                :category="__('Actions')"
+                :text="labels?.save"
+                icon="save"
+                :action="save"
+            >
+                <Button
+                    variant="primary"
+                    :disabled="saving"
+                    :text="saving ? labels?.saving : labels?.save"
+                    @click="save"
+                />
+            </CommandPaletteItem>
         </div>
     </div>
 </template>
@@ -198,11 +212,5 @@ onBeforeUnmount(() => {
     justify-content: flex-end;
     gap: 8px;
     margin-top: 16px;
-}
-
-.sie-cp-failed {
-    margin-top: 12px;
-    font-size: 13px;
-    color: #b42318;
 }
 </style>

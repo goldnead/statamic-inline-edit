@@ -3,6 +3,9 @@ vendor
 .phpunit.result.cache
 .phpunit.cache
 node_modules
+# The Vite dev server's marker. Present only while `npx vite` runs; committed
+# it would tell every installation to load assets from a laptop.
+public/hot
 .php-cs-fixer.cache
 .idea
 composer.lock

@@ -74,16 +74,31 @@ jobs:
         with:
           node-version: '22'
 
-      - run: npm install --no-audit --no-fund
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          coverage: none
+
+      # Before npm, not after: `@statamic/cms` is a file: dependency on
+      # vendor/statamic/cms/resources/dist-package, so the UI kit is pinned to
+      # the Statamic this addon actually builds against. Without vendor/ in
+      # place, `npm install` has nothing to link and the Vite build cannot
+      # even load its own config.
+      - run: composer install --prefer-dist --no-interaction
+
+      # `ci`, not `install`: the lockfile is what makes the two bundles below
+      # reproducible here and on a laptop.
+      - run: npm ci --no-audit --no-fund
 
       - run: npm run build
 
-      # resources/dist/inline-edit-rich.js is committed, because a site that
-      # installs this addon gets no build step. This is what keeps the
-      # committed file honest: if it does not match what the source produces,
-      # the job fails rather than shipping a bundle nobody can reproduce.
-      - name: Fail if the committed bundle is stale
-        run: git diff --exit-code -- resources/dist/inline-edit-rich.js
+      # Both bundles are committed, because a site that installs this addon
+      # gets no build step: resources/dist/inline-edit-rich.js for the public
+      # page, public/build for the control panel. This is what keeps them
+      # honest — if either does not match what the source produces, the job
+      # fails rather than shipping a bundle nobody can reproduce.
+      - name: Fail if a committed bundle is stale
+        run: git diff --exit-code -- resources/dist/inline-edit-rich.js public/build
 
   browser:
     runs-on: ubuntu-latest

@@ -6,10 +6,8 @@
     "watch": "node scripts/build-rich.mjs --watch",
     "test:browser": "node tests/browser/run.mjs"
   },
-  "dependencies": {
-    "@statamic/cms": "file:./vendor/statamic/cms/resources/dist-package"
-  },
   "devDependencies": {
+    "@statamic/cms": "file:./vendor/statamic/cms/resources/dist-package",
     "@tiptap/core": "^3.31.3",
     "@tiptap/extension-link": "^3.31.3",
     "@tiptap/extension-placeholder": "^3.31.3",
