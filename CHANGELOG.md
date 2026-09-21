@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 1.4.0
 
 ### A Bard opens as a Bard, not as the whole entry form
 

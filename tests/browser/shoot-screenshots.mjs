@@ -96,22 +96,15 @@ await shoot(page, '03-control');
 await page.keyboard.press('Escape');
 await page.waitForTimeout(400);
 
-await page.locator('[data-sie-field="schlagworte"]').first().dblclick();
-await page.waitForTimeout(7000);
+// A Bard, which is the field the one-field panel was built for. The frame
+// holds that field and nothing else, so there is no licence dialog to chase
+// here any more: the page inside has no control panel shell to put one in.
+await page.locator('[data-sie-field="inhalt"]').first().dblclick();
+await page.frameLocator('.sie-frame').locator('.sie-cp-field').waitFor({ timeout: 20000 });
 
-// The playground runs Statamic in test mode and says so in a dialog inside
-// the iframe. It is the demo's licence notice, not this addon's, so it does
-// not belong in a picture of this addon.
-const remindLater = page.frameLocator('iframe').first().locator('button:has-text("Später erinnern")').first();
-
-for (let i = 0; i < 3; i++) {
-    if (await remindLater.isVisible().catch(() => false)) {
-        await remindLater.click().catch(() => {});
-        await page.waitForTimeout(900);
-    }
-}
-
-await page.waitForTimeout(1200);
+// The card is sized from a height the form reports once it has mounted, so
+// the picture has to wait for the second size, not the first.
+await page.waitForTimeout(2000);
 await shoot(page, '04-control-panel');
 await desktop.close();
 
