@@ -100,11 +100,27 @@ await page.waitForTimeout(400);
 // holds that field and nothing else, so there is no licence dialog to chase
 // here any more: the page inside has no control panel shell to put one in.
 await page.locator('[data-sie-field="inhalt"]').first().dblclick();
-await page.frameLocator('.sie-frame').locator('.sie-cp-field').waitFor({ timeout: 20000 });
+
+const frame = page.frameLocator('.sie-frame');
+
+await frame.locator('.sie-cp-field').waitFor({ timeout: 20000 });
+
+// The demo runs the suite without a licence and says so in a toast, which
+// the control panel raises inside this frame like on any other CP screen.
+// It is the demo's notice, not this addon's, so it does not belong in a
+// picture of this addon. It can arrive after the form, hence the retries.
+const understood = frame.locator('button:has-text("Verstanden"), button:has-text("Got it")').first();
+
+await understood.waitFor({ timeout: 8000 }).catch(() => {});
+
+if (await understood.isVisible().catch(() => false)) {
+    await understood.click().catch(() => {});
+    await page.waitForTimeout(800);
+}
 
 // The card is sized from a height the form reports once it has mounted, so
 // the picture has to wait for the second size, not the first.
-await page.waitForTimeout(2000);
+await page.waitForTimeout(1500);
 await shoot(page, '04-control-panel');
 await desktop.close();
 

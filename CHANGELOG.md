@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.4.1
+
+### The one-field panel is a white card, not sometimes a black one
+
+The card took its background from the full-screen overlay it grew out of, which is
+near-black. The control panel page inside it paints no canvas of its own, so every moment the
+frame had not painted showed a black card with the form's own dark labels invisible on it.
+Caught on the demo during a screenshot run, where it lasted long enough to be photographed.
+
+The card paints its own surface now. One line, and it removes the whole class of it.
+
 ## 1.4.0
 
 ### A Bard opens as a Bard, not as the whole entry form

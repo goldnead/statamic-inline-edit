@@ -894,6 +894,15 @@
    grows as it is typed into. Until the first message arrives the fallback
    below keeps the panel a sensible size instead of a sliver. */
 .sie-panel.sie-panel-card {
+    /* The card paints its own surface, rather than inheriting the full-screen
+       overlay's near-black.
+       The control panel page inside is transparent — it paints no canvas of
+       its own — so anything behind the frame shows through it. While that was
+       the overlay's black, every moment the frame had not painted showed a
+       black card with the form's dark labels invisible on it. Caught in a
+       screenshot run on the demo, where it survived long enough to be
+       photographed. */
+    background: #fff;
     inset: auto;
     top: 50%;
     left: 50%;
