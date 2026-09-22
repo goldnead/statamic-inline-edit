@@ -22,6 +22,9 @@
     .shell { max-width: 60rem; margin: 0 auto; padding: 3rem 1.5rem 8rem; }
     .column { max-width: 34rem; }
     h1 { font-family: "Times New Roman", serif; font-size: 2.75rem; line-height: 1.1; margin: 0 0 1.5rem; }
+    /* Eine eigene Groesse fuer das h1 *im Text*, damit die Pruefung nicht
+       aus Versehen die des Seitentitels misst. */
+    .prose h1 { font-family: "Times New Roman", serif; font-size: 2.25rem; line-height: 1.15; margin: 0 0 1rem; }
     .prose h2 { font-family: "Times New Roman", serif; font-size: 1.75rem; line-height: 1.25; margin: 2rem 0 .75rem; }
     .prose p { font-size: 1.125rem; margin: 0 0 1.25em; }
     .prose ul { padding-left: 1.6em; margin: 0 0 1.25em; list-style-type: square; }
@@ -44,7 +47,8 @@
      data-sie-id="entry-1" data-sie-field="content" data-sie-type="bard" data-sie-mode="inline"
      data-sie-reload="true" data-sie-label="Inhalt" data-sie-stamp="1700000000"
      data-sie-cp="./fixture-cp-field.html"
-     data-sie-field-url="./fixture-cp-field.html?inplace=1"><h2>Eine Überschrift</h2>
+     data-sie-field-url="./fixture-cp-field.html?inplace=1"><h1>Die Überschrift im Text</h1>
+<h2>Eine Überschrift</h2>
 <p class="measured">Technik ist ein Durchgangsstadium und kein Ziel. Wer die Stimme einmal verstanden hat, hört im Chor plötzlich, woran es liegt.</p>
 <ul><li>Ein Punkt</li></ul></div>
 

@@ -1040,9 +1040,17 @@
     var PROBES = [
         ['', ''],
         ['p', 'p'],
+        // h1 included, and it was not at first. A Bard whose text starts with
+        // its own top-level heading — which is how an imported article
+        // usually looks — then opened with that heading at the control
+        // panel's size, which is half the page's. The one thing this mode
+        // promises, wrong in the largest type on the screen.
+        ['h1', 'h1'],
         ['h2', 'h2'],
         ['h3', 'h3'],
         ['h4', 'h4'],
+        ['h5', 'h5'],
+        ['h6', 'h6'],
         ['ul', 'ul'],
         ['ol', 'ol'],
         ['ul>li', 'li'],

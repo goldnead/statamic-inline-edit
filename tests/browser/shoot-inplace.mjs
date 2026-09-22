@@ -47,7 +47,34 @@ await page.press('input[type="password"], input[name="password"]', 'Enter');
 await page.waitForURL((url) => !url.pathname.includes('/auth/login'), { timeout: 30000 });
 console.log('signed in, landed on ' + new URL(page.url()).pathname);
 
-await page.goto(BASE + PATHNAME, { waitUntil: 'domcontentloaded' });
+// `SIE_VIA` reaches the page the way a reader does, through a link on another
+// page. On a site that draws itself that is not a request: the response is
+// JSON, nothing is injected into it, and the markers arrive after the script
+// did. It is the path where this used to be silently dead, so it is the path
+// worth photographing.
+if (process.env.SIE_VIA) {
+    await page.goto(BASE + process.env.SIE_VIA, { waitUntil: 'domcontentloaded' });
+    await page.waitForTimeout(1500);
+
+    // The named target if that page links to it, otherwise whatever it does
+    // link to under the same prefix. Which article is reached matters less
+    // than that it was reached without a request.
+    let link = page.locator('a[href="' + PATHNAME + '"]').first();
+
+    if (await link.count() === 0) {
+        link = page.locator('a[href^="' + PATHNAME.replace(/\/[^/]*$/, '/') + '"]').first();
+        console.log('via ' + process.env.SIE_VIA + ': the target is not linked there, taking the first one that is');
+    }
+
+    await link.scrollIntoViewIfNeeded();
+    await link.click();
+    await page.waitForTimeout(2500);
+
+    console.log('landed on ' + new URL(page.url()).pathname + ' (no reload in between)');
+} else {
+    await page.goto(BASE + PATHNAME, { waitUntil: 'domcontentloaded' });
+}
+
 await page.waitForTimeout(1200);
 
 // The playground's own consent banner sits over the bottom half of the page.

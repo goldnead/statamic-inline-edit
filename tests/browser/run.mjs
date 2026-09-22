@@ -1023,6 +1023,17 @@ check(
     'h2 is ' + innerHeading
 );
 
+// The one that was missed the first time round. A Bard whose text starts with
+// its own top-level heading — which is what an imported article looks like —
+// opened with that heading at half the size, in the largest type on the page.
+const innerTop = await inner.locator('.ProseMirror h1').first().evaluate((el) => getComputedStyle(el).fontSize);
+
+check(
+    'including the top-level one inside the text',
+    innerTop === '36px',
+    'h1 is ' + innerTop
+);
+
 // The number the third Gauntlet round was sent back over: everything matched
 // and the line still broke one word earlier, because the control panel asks
 // the same variable font for a different optical size than the site does.
