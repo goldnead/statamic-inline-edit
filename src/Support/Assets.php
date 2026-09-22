@@ -75,6 +75,7 @@ class Assets
                 'badge_text' => __('statamic-inline-edit::messages.badge_text'),
                 'badge_control' => __('statamic-inline-edit::messages.badge_control'),
                 'badge_source' => __('statamic-inline-edit::messages.badge_source'),
+                'badge_inline' => __('statamic-inline-edit::messages.badge_inline'),
                 'badge_cp' => __('statamic-inline-edit::messages.badge_cp'),
             ],
         ];

@@ -136,6 +136,40 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Fieldtypes that open in place
+    |--------------------------------------------------------------------------
+    |
+    | Fields too big for this addon's own editor and too central to the page to
+    | be pulled out of it. A Bard is the article. Opening it as a card in the
+    | middle of the screen means writing the page somewhere that is not the
+    | page, and the layout you were looking at is gone while you type.
+    |
+    | These open the same real control panel field as the list below — same
+    | fieldtype, same validation, same save — but the frame is put where the
+    | content was, at the width the content had, with nothing painted behind
+    | it. The page keeps its header, its margins and its type, and the text
+    | you are editing sits in the column it will be read in.
+    |
+    | The typography is not guessed: the page measures the element that was
+    | double-clicked and hands the editor its font, size, leading, colour and
+    | spacing, for each kind of block it can contain.
+    |
+    | Needs the pair form, because what a Bard renders is the template's job:
+    |
+    |     {{ editable field="content" }}{{ content }}{{ /editable }}
+    |
+    | Entries under revisions keep the card: one field written past a working
+    | copy would publish straight to the site, and the one-field route refuses
+    | them for that reason.
+    |
+    */
+
+    'inline' => [
+        'bard',
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Inject the editor automatically
     |--------------------------------------------------------------------------
     |
@@ -150,6 +184,31 @@ return [
     */
 
     'inject' => true,
+
+    /*
+    |--------------------------------------------------------------------------
+    | Which route groups the editor rides on
+    |--------------------------------------------------------------------------
+    |
+    | `statamic.web` is the group Statamic serves its own pages in, and on an
+    | Antlers site that is every page there is. Leave this alone.
+    |
+    | A site that draws its own pages — React through Inertia, Blade, a
+    | controller of your own — serves them from `web` instead, and none of that
+    | goes through `statamic.web`. Nothing would inject the editor there, and
+    | nothing would mark those responses uncacheable either. Add your group:
+    |
+    |     'middleware_groups' => ['statamic.web', 'web'],
+    |
+    | Naming both is safe. Statamic's own frontend controller adds
+    | `statamic.web` on top of `web`, so its pages pass through twice, and the
+    | second pass sees the script is already there and leaves it alone.
+    |
+    */
+
+    'middleware_groups' => [
+        'statamic.web',
+    ],
 
     /*
     |--------------------------------------------------------------------------

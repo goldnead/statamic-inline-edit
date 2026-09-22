@@ -14,11 +14,17 @@ class ServiceProvider extends AddonServiceProvider
      * The action routes are discovered from routes/actions.php the same way,
      * and land under /!/statamic-inline-edit/.
      */
-    protected $middlewareGroups = [
-        'statamic.web' => [
-            InjectEditor::class,
-        ],
-    ];
+    /**
+     * Filled in register() from the config, because which groups these are is
+     * a property of the site and not of the addon. A Statamic site drawn by
+     * React or Blade serves its pages from its own routes, which are in `web`
+     * and never in `statamic.web` — on such a site the default here would
+     * mean the editor is installed, the markers are in the HTML, and nothing
+     * ever loads the script that acts on them.
+     *
+     * @var array<string, list<class-string>>
+     */
+    protected $middlewareGroups = [];
 
     /**
      * The control panel bundle: one Inertia page, which renders a single field
@@ -53,6 +59,18 @@ class ServiceProvider extends AddonServiceProvider
         parent::register();
 
         $this->mergeConfigFrom(__DIR__.'/../config/statamic-inline-edit.php', 'statamic-inline-edit');
+
+        // Read here rather than in boot: the parent walks this property in
+        // bootMiddleware(), and register() is the last moment at which it is
+        // still ours. Deduplicated, because a group named twice would push the
+        // middleware twice and inject the editor twice into one page.
+        $groups = collect(config('statamic-inline-edit.middleware_groups', ['statamic.web']))
+            ->filter(fn ($group): bool => is_string($group) && $group !== '')
+            ->unique();
+
+        $this->middlewareGroups = $groups
+            ->mapWithKeys(fn (string $group): array => [$group => [InjectEditor::class]])
+            ->all();
 
         // One per request. The tag sets the "a marker was rendered" flag and
         // the middleware reads it on the way out; separate instances would mean

@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<title>Inline Edit in-place fixture</title>
+
+<!--
+  A Bard that opens where it stands.
+
+  The page around it is the point of this fixture, not the field. A narrow
+  column inside a wider one, a heading above and a footer below, real margins,
+  and a typeface that is nothing like the control panel's. If the frame
+  replaces the block correctly, none of that moves; if the typography travels,
+  the stub inside is set in Georgia at the page's size and not in the control
+  panel's sans-serif.
+-->
+
+<link rel="stylesheet" href="../../resources/dist/inline-edit.css">
+
+<style>
+    body { margin: 0; font-family: Georgia, serif; line-height: 1.7; color: #23232b; }
+    .shell { max-width: 60rem; margin: 0 auto; padding: 3rem 1.5rem 8rem; }
+    .column { max-width: 34rem; }
+    h1 { font-family: "Times New Roman", serif; font-size: 2.75rem; line-height: 1.1; margin: 0 0 1.5rem; }
+    .prose h2 { font-family: "Times New Roman", serif; font-size: 1.75rem; line-height: 1.25; margin: 2rem 0 .75rem; }
+    .prose p { font-size: 1.125rem; margin: 0 0 1.25em; }
+    .prose ul { padding-left: 1.6em; margin: 0 0 1.25em; list-style-type: square; }
+    .prose a { color: #b4451f; text-decoration-line: underline; }
+    .after { border-top: 1px solid #ddd; padding-top: 1rem; color: #666; }
+</style>
+</head>
+<body>
+
+<div class="shell">
+<div class="column">
+
+<h1>Ein Artikel</h1>
+
+<!--
+  The marker a Bard gets. `data-sie-field-url` is the one-field form; without
+  it the mode falls back to the card, which is exactly what the server does.
+-->
+<div class="prose"
+     data-sie-id="entry-1" data-sie-field="content" data-sie-type="bard" data-sie-mode="inline"
+     data-sie-reload="true" data-sie-label="Inhalt" data-sie-stamp="1700000000"
+     data-sie-cp="./fixture-cp-field.html"
+     data-sie-field-url="./fixture-cp-field.html?inplace=1"><h2>Eine Überschrift</h2>
+<p>Ein Absatz, der aussehen soll wie auf der Seite.</p>
+<ul><li>Ein Punkt</li></ul></div>
+
+<p class="after">Etwas, das unter dem Feld steht und sich nicht verschieben darf.</p>
+
+</div>
+</div>
+
+<script id="statamic-inline-edit-config" type="application/json">
+{
+  "saveUrl": "https://fixture.test/!/statamic-inline-edit/save",
+  "previewUrl": "https://fixture.test/!/statamic-inline-edit/preview",
+  "rich": true,
+  "richUrl": "../../resources/dist/inline-edit-rich.js",
+  "csrf": "test-csrf-token",
+  "maxLength": 100000,
+  "labels": {
+    "edit": "Edit page",
+    "editing": "Editing",
+    "save": "Save",
+    "discard": "Discard",
+    "close": "Close",
+    "unsaved": ":count unsaved",
+    "hint": "Tap or double-click any highlighted text.",
+    "badge_inline": "Editor"
+  }
+}
+</script>
+<script src="../../resources/dist/inline-edit.js"></script>
+
+</body>
+</html>

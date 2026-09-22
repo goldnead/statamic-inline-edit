@@ -95,6 +95,8 @@ class Editor
      *              so the element is a trigger for a small control
      *  - `source`  the value is text but the page shows it rendered, so the
      *              rendered output is swapped for its own source
+     *  - `inline`  the real control panel field, but put where the content
+     *              was instead of over it — for a Bard, which *is* the page
      *  - `cp`      nothing we can do justice to here, so the control panel
      *              opens over the page
      *
@@ -119,7 +121,19 @@ class Editor
             return 'source';
         }
 
-        return config('statamic-inline-edit.control_panel', true) ? 'cp' : null;
+        if (! config('statamic-inline-edit.control_panel', true)) {
+            return null;
+        }
+
+        // Both of these open the same control panel field. The difference is
+        // only where the frame is put, so `inline` degrades to `cp` the moment
+        // the one-field route is unavailable — that decision needs the entry
+        // and belongs to the tag, not here.
+        if (in_array($type, (array) config('statamic-inline-edit.inline', []), true)) {
+            return 'inline';
+        }
+
+        return 'cp';
     }
 
     /**

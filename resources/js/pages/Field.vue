@@ -18,6 +18,7 @@ const props = defineProps([
     'saveUrl',    // PATCH endpoint
     'csrfToken',
     'readOnly',
+    'inplace',    // the frame stands where the content stood, not on a card
     'labels',     // { save, saving, close, failed }
 ]);
 
@@ -122,7 +123,35 @@ function reportHeight() {
     // The form's own box, never `documentElement.scrollHeight`. The document
     // in a frame is at least as tall as the frame, so a panel sized from it
     // can grow and never shrink — it reports the height it was just given.
-    if (root.value) tell('height', { height: Math.ceil(root.value.offsetHeight) });
+    if (! root.value) return;
+
+    const box = root.value.getBoundingClientRect();
+    const top = box.top + window.scrollY;
+    const height = Math.ceil(top + root.value.offsetHeight);
+
+    if (! props.inplace) {
+        tell('height', { height });
+
+        return;
+    }
+
+    // Standing in for content, the frame has to say more than how tall it is.
+    // A toolbar above the text and a pair of buttons below it are part of this
+    // document's height but must not be part of the article's: if the page
+    // made room for them, opening the editor would shove everything below it
+    // down the screen, starting with the paragraph that was double-clicked.
+    //
+    // So: where the text starts inside this document, and how tall the text
+    // is. The page pulls the frame up by the first and lets the rest hang
+    // over what is above and below, which is where floating chrome belongs.
+    const editor = root.value.querySelector('.ProseMirror') ?? root.value;
+    const editorBox = editor.getBoundingClientRect();
+
+    tell('height', {
+        height,
+        lift: Math.max(0, Math.round(editorBox.top + window.scrollY)),
+        content: Math.ceil(editorBox.height),
+    });
 }
 
 function onKeydown(event) {
@@ -138,6 +167,46 @@ function onKeydown(event) {
     }
 }
 
+/**
+ * The page's own typography, handed over by the page.
+ *
+ * This frame carries the control panel's stylesheet, so a Bard in it is set in
+ * the control panel's font at the control panel's size — which is the right
+ * answer on a card over the site and the wrong one when the frame is standing
+ * in the article's column. What the editor shows has to be what the article
+ * shows, or every line break lands somewhere else than it will on the page.
+ *
+ * Measured over there, not guessed here: the page reads the computed style of
+ * the element that was double-clicked and of a probe for each kind of block a
+ * Bard can produce, and sends back rules already scoped to `.ProseMirror`.
+ * Nothing about the site's stylesheet is loaded into this document — that
+ * would put Tailwind's preflight through the control panel's own UI.
+ */
+const pageStyles = ref('');
+
+function onMessage(event) {
+    // Only the window that framed us, and only from the same origin. The
+    // control panel and the site share one in every setup where this frame
+    // works at all; where they do not, this quietly does nothing, which is
+    // the right failure for a message that carries nothing but appearance.
+    if (event.source !== window.parent) return;
+    if (event.origin !== window.location.origin) return;
+
+    const data = event.data;
+
+    if (! data || data.source !== 'statamic-inline-edit-host') return;
+
+    if (data.type === 'styles' && typeof data.css === 'string') {
+        pageStyles.value = data.css;
+
+        // And measure again once they have taken effect. The rules change the
+        // toolbar's padding and the editor's, so the numbers reported before
+        // they arrived describe a layout that no longer exists — and the page
+        // would put the text a few pixels off the line it belongs on.
+        requestAnimationFrame(() => requestAnimationFrame(reportHeight));
+    }
+}
+
 onMounted(() => {
     reportHeight();
 
@@ -145,16 +214,36 @@ onMounted(() => {
     observer.observe(root.value);
 
     document.addEventListener('keydown', onKeydown);
+    window.addEventListener('message', onMessage);
+
+    // The card paints its own white behind this document; in place there must
+    // be nothing behind it at all, or the page's own background, image or
+    // border stops at the edge of the frame. The control panel's layout sets
+    // this on the elements themselves, so it is taken off the same way.
+    if (props.inplace) {
+        document.documentElement.style.background = 'transparent';
+        document.body.style.background = 'transparent';
+
+        // No scrollbar, ever. This document is exactly as tall as the page
+        // made it, so a bar down the right edge would only be a few pixels of
+        // width taken off the text — and a line that breaks one word earlier
+        // than it will on the page is the whole promise broken.
+        document.documentElement.style.overflow = 'hidden';
+    }
+
+    tell('ready');
 });
 
 onBeforeUnmount(() => {
     observer?.disconnect();
     document.removeEventListener('keydown', onKeydown);
+    window.removeEventListener('message', onMessage);
 });
 </script>
 
 <template>
-    <div ref="root" class="sie-cp-field">
+    <div ref="root" class="sie-cp-field" :class="{ 'sie-cp-inplace': inplace }">
+        <component :is="'style'" v-if="inplace && pageStyles" v-text="pageStyles" />
         <PublishContainer
             name="inline-edit-field"
             :blueprint="blueprint"
@@ -212,5 +301,20 @@ onBeforeUnmount(() => {
     justify-content: flex-end;
     gap: 8px;
     margin-top: 16px;
+}
+
+/* ------------------------------------------------------------- in place */
+
+/* Standing in the article's column rather than on a card over it.
+
+   Only what depends on this component's own markup lives here. The rules that
+   take the control panel's surfaces away — the box around the field, the
+   label, the editor's padding — arrive from the page together with its
+   typography, because they are the same job: one payload decides how this
+   frame stops looking like a form and starts looking like the article. */
+
+.sie-cp-field.sie-cp-inplace {
+    padding: 0;
+    background: transparent;
 }
 </style>

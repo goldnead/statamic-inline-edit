@@ -105,7 +105,7 @@ same reason.
 
 ## What can be edited
 
-Four kinds of field, four different things happen. Which one a field gets is decided by its
+Five kinds of field, five different things happen. Which one a field gets is decided by its
 fieldtype, in `config/statamic-inline-edit.php`.
 
 | | Fieldtypes | Double-clicking it |
@@ -113,9 +113,10 @@ fieldtype, in `config/statamic-inline-edit.php`.
 | **text** | `text`, `textarea`, `integer` | The text itself opens. What you type is what the page will show. |
 | **control** | `toggle`, `select`, `date` | A small control opens. The value is not the text on the page, so there is nothing to put a cursor in. |
 | **source** | `markdown` | The text becomes a real editor, in place. Markdown shortcuts as you type, a toolbar over the selection. |
+| **inline** | `bard` | The real control panel field, put over the block it belongs to, in the page's own type. |
 | **cp** | everything else | That one field opens as a control panel publish form, in a panel over the page. |
 
-Only **text** keeps what you typed on the page as you typed it. The other three reload the page
+Only **text** keeps what you typed on the page as you typed it. The other four reload the page
 after saving, because only the server knows what the template will make of the new value.
 
 ### Why each one is the way it is
@@ -150,6 +151,31 @@ dialect. Opening a field and closing it without typing never writes anything, be
 comparison is against what the editor produced on mount rather than against what was stored.
 But if you have markdown that has to come back byte for byte, hand-written tables, HTML blocks,
 footnotes, set `rich` to `false` and you get the plain source editor instead.
+
+**inline** is the same real control panel field as **cp**, put over the block it belongs to
+rather than on a card in the middle of the screen. It is for the field that holds the article.
+A Bard is not a field on a page, it *is* the page — on a card it has a different column width,
+a different typeface and a different measure, and you cannot see what you are writing.
+
+The block keeps its box and stops being drawn; the frame goes over it and paints nothing of its
+own. The page reads exactly as it did, because as far as the page is concerned nothing changed.
+The typography is measured, not approximated: the page reads the computed style of the element
+you double-clicked and of one probe for each kind of block a Bard can make, and hands the
+result to the editor. Your stylesheet is never loaded into the control panel, which would put
+your reset through its interface.
+
+Everything a control panel draws to tell one field from the next comes off — the box, the
+label, the instructions, the editor's padding and background. The toolbar becomes a floating
+panel as wide as its buttons, and Save and Close a second one, and the page's own bar steps
+aside while the field is open.
+
+Two things to know. The frame covers a band above and below the text while it is open, and a
+click there does not reach the page: an iframe cannot let a click through part of itself. And
+the block keeps the height it had, so the page does not reflow while the text grows — the frame
+covers more of what is under it, and the reload after saving puts it right.
+
+Add or remove fieldtypes in `inline`. An entry under revisions gets the card instead, for the
+same reason it always did.
 
 **cp** is the real control panel field in an iframe, not a rebuilt editor. Bard alone is an
 entire editor and an asset picker is an entire browser; a second-rate copy of either is worse
@@ -231,7 +257,9 @@ php artisan vendor:publish --tag=statamic-inline-edit-config
 | `controls` | `toggle`, `select`, `date` | Edited through a small control. |
 | `source` | `markdown` | Edited in place with a real editor. |
 | `rich` | `true` | The editor for those. `false` gives the plain markdown source in a monospace box instead. |
+| `inline` | `bard` | The real control panel field, opened over the block instead of on a card. |
 | `control_panel` | `true` | Everything else opens the control panel in an overlay. Off means those fields are simply not clickable. |
+| `middleware_groups` | `statamic.web` | Which route groups the editor rides on. A site that serves its own pages adds `web`. |
 | `multiline` | `textarea` | Of the text ones, where Enter inserts a line break instead of leaving the field. |
 | `inject` | `true` | Places the editor before `</body>` automatically. Switch off and use `{{ inline_edit:assets }}` if a Content Security Policy needs the script somewhere specific. |
 | `max_length` | `100000` | A ceiling on any one field, independent of the blueprint. |
@@ -240,13 +268,58 @@ Two routes are registered under the action prefix: `save`, which writes, and `pr
 renders a markdown value through its own fieldtype and writes nothing. Both check the same
 permission as the control panel, and both answer 404 when `enabled` is off.
 
+## A front end that is not Antlers
+
+A Statamic site is not always Antlers. The content stays, the control panel stays, and the
+pages are drawn by React through Inertia, by Blade, or by a front end of its own. There is no
+template to put a tag in, so ask for the marker directly:
+
+```php
+use Goldnead\StatamicInlineEdit\InlineEdit;
+
+return Inertia::render('Site/ArticleDetail', [
+    'article' => $article,
+    'edit' => [
+        'title' => InlineEdit::marker($entry, 'title'),
+        'content' => InlineEdit::marker($entry, 'content'),
+    ],
+]);
+```
+
+```jsx
+<h1 {...edit.title}>{article.title}</h1>
+<div {...edit.content} dangerouslySetInnerHTML={{ __html: article.content }} />
+```
+
+In Blade, `InlineEdit::attributes($entry, 'content')` gives the same thing as an escaped
+attribute string.
+
+It is the same decision the tag makes, from the same place — the same permissions, the same
+refusals, the same fieldtype handling. An empty array is the normal answer, because it is what
+every visitor gets, and an element that spreads an empty array is byte for byte the element it
+was.
+
+One thing such a site has to do that an Antlers site does not: name its own route group.
+
+```php
+'middleware_groups' => ['statamic.web', 'web'],
+```
+
+Pages your controllers serve are in `web` and never in `statamic.web`, so without this nothing
+injects the editor there and nothing marks those responses uncacheable. Naming both is safe —
+Statamic's own frontend controller adds `statamic.web` on top of `web`, so its pages pass
+through twice, and the second pass leaves the script it finds alone.
+
+`InlineEdit::active()` answers whether this request has a marker on it at all, and
+`InlineEdit::assets()` gives the markup for a layout that places the script itself.
+
 ## Not in this version
 
 Named, not hidden:
 
-- **Bard and Replicator, inline.** Core builds the values inside a set without a link back to
-  their entry, so a paragraph in a Bard is genuinely unaddressable from the page. Marking the
-  whole field opens the control panel instead, which is the honest answer.
+- **A paragraph inside a Bard or a Replicator set.** Core builds those values without a link
+  back to their entry, so a single paragraph inside a set is genuinely unaddressable from the
+  page. The whole Bard opens instead, over the block it belongs to.
 - **Revisions.** A collection with revisions enabled refuses the save on the page and says so,
   rather than writing straight past a workflow whose whole point is that somebody approves
   first. Its fields are still reachable through the control panel overlay, where revisions work

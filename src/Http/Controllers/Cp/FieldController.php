@@ -58,6 +58,11 @@ class FieldController extends CpController
             // along as a prop rather than being dug back out of the cookie jar.
             'csrfToken' => csrf_token(),
             'readOnly' => $request->user()->cant('update', $entry),
+            // Whether this frame stands where the content stood, rather than
+            // on a card over it. It changes nothing about what is saved and
+            // nothing about who may save it — only the chrome around the
+            // field, which is why it may come from the query string.
+            'inplace' => $request->boolean('inplace'),
             'labels' => [
                 'save' => __('statamic-inline-edit::messages.save'),
                 'saving' => __('statamic-inline-edit::messages.saving'),

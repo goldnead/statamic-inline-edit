@@ -75,6 +75,16 @@ class InjectEditor
             return $response;
         }
 
+        // Already there. A site that serves its own pages adds `web` to the
+        // configured groups, and Statamic's own frontend controller puts
+        // `statamic.web` on top of `web` — so a page rendered by Statamic
+        // passes through this twice. Two copies of the script means two
+        // editor bars, two sets of listeners, and every double-click opening
+        // the field twice.
+        if (str_contains($content, 'id="statamic-inline-edit-config"')) {
+            return $response;
+        }
+
         // The last one, not the first: a page may well contain the string
         // "</body>" inside an example, a code block or an escaped snippet, and
         // the document's own closing tag is the last of them.

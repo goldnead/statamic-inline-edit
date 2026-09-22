@@ -31,6 +31,7 @@ return [
     'badge_text' => 'Text',
     'badge_control' => 'Wert',
     'badge_source' => 'Markdown',
+    'badge_inline' => 'Editor',
     'badge_cp' => 'Control Panel',
 
     'error_auth' => 'Du bist nicht angemeldet.',

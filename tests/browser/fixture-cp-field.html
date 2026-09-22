@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<title>CP field stub</title>
+
+<!--
+  Stands in for the one-field control panel form, for the in-place tests.
+
+  It is not the real page: the real one is Vue, needs Inertia, needs the whole
+  control panel bundle, and none of that belongs in a suite that runs against
+  file:// with no PHP. What it does reproduce is the only part the page outside
+  depends on — the handshake. It says `ready`, it takes the typography it is
+  handed, it reports a height, and it can say `saved` and `close`.
+
+  It also carries `.sie-cp-inplace` and a `.ProseMirror` under a wrapper,
+  because that is the shape the generated rules are written for, and a stub
+  with a different shape would let a broken selector pass.
+-->
+
+<style>
+    /* The control panel's own type, deliberately nothing like the page's.
+       Every one of these must lose to the rules that arrive over the wire. */
+    body { margin: 0; font-family: "Helvetica Neue", Arial, sans-serif; font-size: 14px; color: #1f2937; }
+    .field-box { border: 1px solid #d4d4d8; border-radius: 6px; background: #fff; padding: 12px; }
+    .ProseMirror { padding: 8px; min-height: 120px; }
+    .ProseMirror h2 { font-size: 18px; margin: 0 0 6px; }
+    .ProseMirror p { margin: 0 0 8px; }
+    .bard-fixed-toolbar { background: #fff; border: 1px solid #d4d4d8; padding: 8px; }
+    .sie-cp-actions { display: flex; gap: 8px; margin-top: 16px; }
+</style>
+</head>
+<body>
+
+<div class="sie-cp-field sie-cp-inplace">
+    <!-- A toolbar above the text and buttons below it, like the real form.
+         They are the reason the frame is taller than the article's block, and
+         a stub without them could not show that the page stays put. -->
+    <div class="bard-fixed-toolbar">B  I  H2</div>
+
+    <div class="field-box">
+        <div class="ProseMirror" contenteditable="true">
+            <h2>Eine Überschrift</h2>
+            <p>Ein Absatz, der aussehen soll wie auf der Seite.</p>
+            <ul><li>Ein Punkt</li></ul>
+        </div>
+    </div>
+
+    <div class="sie-cp-actions">
+        <button type="button">Schließen</button>
+        <button type="button">Speichern</button>
+    </div>
+</div>
+
+<script>
+(function () {
+    function tell(type, payload) {
+        var message = { source: 'statamic-inline-edit', type: type };
+
+        for (var key in (payload || {})) message[key] = payload[key];
+
+        parent.postMessage(message, '*');
+    }
+
+    window.addEventListener('message', function (event) {
+        if (event.source !== window.parent) return;
+        if (event.origin !== window.location.origin) return;
+
+        var data = event.data;
+
+        if (!data || data.source !== 'statamic-inline-edit-host') return;
+
+        if (data.type === 'styles') {
+            var style = document.createElement('style');
+            style.id = 'sie-page-styles';
+            style.textContent = data.css;
+            document.head.appendChild(style);
+
+            // Those rules change the toolbar's padding and the editor's, so
+            // the numbers sent before they arrived describe a layout that is
+            // already gone. The real form re-measures here too.
+            requestAnimationFrame(function () { requestAnimationFrame(report); });
+        }
+    });
+
+    // What the real page does when it is standing in for content: paint
+    // nothing of its own, so the page behind shows through.
+    document.documentElement.style.background = 'transparent';
+    document.body.style.background = 'transparent';
+
+    document.documentElement.style.overflow = 'hidden';
+
+    /**
+     * The same three numbers the real form reports: how tall this document is,
+     * how far into it the text begins, and how tall the text is. Without the
+     * last two the page has no way of putting the text back where it was.
+     */
+    function report() {
+        var root = document.querySelector('.sie-cp-field');
+        var editor = document.querySelector('.ProseMirror');
+        var rootBox = root.getBoundingClientRect();
+        var editorBox = editor.getBoundingClientRect();
+
+        tell('height', {
+            height: Math.ceil(rootBox.top + window.scrollY + root.offsetHeight),
+            lift: Math.max(0, Math.round(editorBox.top + window.scrollY)),
+            content: Math.ceil(editorBox.height),
+        });
+    }
+
+    // The two the frame outside waits for, in the order it waits for them.
+    tell('ready');
+    report();
+
+    window.sieStubReport = report;
+
+    // A way to ask for the other two from the test.
+    window.sieStubSay = tell;
+})();
+</script>
+
+</body>
+</html>

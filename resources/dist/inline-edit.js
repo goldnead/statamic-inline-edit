@@ -97,11 +97,12 @@
         delete node.dataset.sieGhost;
     }
 
-    /** Which of the four kinds this field is, said out loud on the page. */
+    /** Which of the five kinds this field is, said out loud on the page. */
     var BADGES = {
         text: L.badge_text || 'Text',
         control: L.badge_control || 'Wert',
         source: L.badge_source || 'Markdown',
+        inline: L.badge_inline || 'Editor',
         cp: L.badge_cp || 'Control Panel',
     };
 
@@ -184,7 +185,10 @@
     function paint() {
         var count = dirty().length;
 
-        bar.hidden = !editing;
+        // While a field is open in place, the page's bar has nothing to say.
+        // The one thing there is to save is in the frame, and it has its own
+        // Save; a second one in the bar, greyed out, only asks which is which.
+        bar.hidden = !editing || !!inplaceFor;
         launcher.hidden = editing;
 
         countEl.textContent = editing
@@ -283,12 +287,17 @@
     }
 
     /**
-     * Four kinds of field, four different ways in.
+     * Five kinds of field, five different ways in.
      *
      * `text` is the one from version 1: the value is the text on the page, so
-     * the text itself opens. The other three exist because their value is not
+     * the text itself opens. The others exist because their value is not
      * what the page shows, and pretending otherwise is how an editor saves
      * something they never saw.
+     *
+     * `inline` and `cp` are the same form; only where it is put differs. A
+     * Bard holding the article is not a field on a page, it *is* the page, and
+     * pulling it onto a card in the middle of the screen takes away the column
+     * width, the type and the rest of the layout that the writing depends on.
      */
     function open(node) {
         if (!editing) return;
@@ -297,6 +306,7 @@
 
         if (mode === 'control') return openControl(node);
         if (mode === 'source') return openSource(node);
+        if (mode === 'inline') return openInplace(node);
         if (mode === 'cp') return openPanel(node);
 
         return startEditing(node);
@@ -725,6 +735,409 @@
         area.value = area.value.slice(0, start) + prefix + area.value.slice(start);
         area.focus();
         area.setSelectionRange(a + prefix.length, a + prefix.length);
+    }
+
+    /* ------------------------------------------------- the field, in place */
+
+    /**
+     * The same one-field control panel form as the card below, put where the
+     * content was instead of over it.
+     *
+     * For a Bard the card was the wrong shape from the start. A Bard is the
+     * article: its line length, its type and its headings are the page's, and
+     * a 760-pixel card in the middle of a dark overlay is a different document
+     * with the same words in it. You cannot see what you are writing.
+     *
+     * So the element is taken out of the flow and the frame is put in its
+     * place, at the width the content had, with nothing painted behind it.
+     * What is inside is untouched: core's own Bard, core's validation, core's
+     * save. Only the chrome is gone, and the page's own typography is handed
+     * over so the text in the editor sets the way the text on the page sets.
+     */
+    var inplace = document.createElement('div');
+    inplace.className = 'sie-inplace';
+    inplace.hidden = true;
+    inplace.innerHTML = '<iframe class="sie-inplace-frame" title=""></iframe>';
+
+    var inplaceFrame = inplace.querySelector('.sie-inplace-frame');
+
+    /** The node this frame is standing in for, and how it used to look. */
+    var inplaceFor = null;
+    var inplaceVisibility = '';
+
+    /** Measured before the node is hidden, sent when the frame says it is up. */
+    var inplaceCss = '';
+
+    /** What the form last said about itself: total height, and where its text starts. */
+    var inplaceGeom = null;
+
+    function openInplace(node) {
+        // Without the one-field route there is only the whole entry form, and
+        // that cannot stand in an article's column. The card still can.
+        if (!node.dataset.sieFieldUrl) return openPanel(node);
+
+        if (inplaceFor) return;
+
+        if (dirty().length && !window.confirm(L.leave_panel || L.leave || '')) return;
+
+        // Measured first, while the element is still laid out. Once it is
+        // hidden its computed style is still readable but its box is not, and
+        // the box is what tells the frame how tall to start.
+        inplaceCss = typography(node);
+
+        inplaceFrame.title = node.dataset.sieLabel || node.dataset.sieField || '';
+
+        var box = node.getBoundingClientRect();
+
+        // Over the block, never in its place.
+        //
+        // Taking the block out of the flow and putting a frame there looks
+        // like the obvious move and is wrong, because an iframe does not
+        // inherit what the block did to the space around it. A heading's top
+        // margin collapses out through its parent; a replaced element has no
+        // children to collapse anything, so the gap above closes by exactly
+        // that margin and the whole article slides up. Measured at eight
+        // pixels on the test page, and it would be a different eight on every
+        // site.
+        //
+        // So the block keeps its box and only stops being drawn, and the frame
+        // is positioned over it in document coordinates. Nothing in the page
+        // moves, because as far as the page is concerned nothing changed.
+        //
+        // ponytail: the block keeps the height it had, so the page does not
+        // reflow while the text grows — the frame simply covers more of what
+        // is under it, and the reload after saving puts it right. Giving the
+        // block an explicit height would make it reflow and would also stop
+        // its last child's margin collapsing out, which is the same class of
+        // bug one end further down.
+        inplace.classList.add('sie-inplace-measuring');
+        inplace.style.width = Math.round(box.width) + 'px';
+        inplace.style.setProperty('--sie-inplace-height', Math.max(240, Math.ceil(box.height)) + 'px');
+
+        document.body.appendChild(inplace);
+
+        inplaceFor = node;
+        inplaceGeom = null;
+        inplace.hidden = false;
+        inplaceFrame.src = node.dataset.sieFieldUrl;
+
+        window.addEventListener('resize', positionInplace);
+
+        // The page's own bar is about the other fields, and while this is open
+        // there is exactly one thing to save. Two buttons saying "Speichern",
+        // one of them greyed out, is a question nobody should have to answer.
+        paint();
+    }
+
+    /**
+     * Put the frame where the content is, to the pixel.
+     *
+     * `lift` is how far into the form the text begins — the toolbar's height,
+     * essentially. The frame's top goes that far above the block, so the first
+     * line lands on the line it replaced and the toolbar hangs over whatever
+     * is above. The buttons hang over whatever is below. The frame paints
+     * nothing of its own, so the page shows through everywhere they are not.
+     */
+    function placeInplace(data) {
+        inplaceGeom = {
+            height: Math.max(40, data.height | 0),
+            lift: Math.max(0, data.lift | 0),
+        };
+
+        if (inplace.classList.contains('sie-inplace-measuring')) {
+            // First measurement: now the swap. `visibility`, not `display` —
+            // the block has to keep its box, which is the whole trick.
+            inplace.classList.remove('sie-inplace-measuring');
+
+            inplaceVisibility = inplaceFor.style.visibility;
+            inplaceFor.style.setProperty('visibility', 'hidden', 'important');
+
+            positionInplace();
+            inplaceFrame.focus();
+
+            return;
+        }
+
+        positionInplace();
+    }
+
+    function positionInplace() {
+        if (!inplaceFor || !inplaceGeom) return;
+
+        var box = inplaceFor.getBoundingClientRect();
+
+        inplace.style.left = Math.round(box.left + window.scrollX) + 'px';
+        inplace.style.top = Math.round(box.top + window.scrollY - inplaceGeom.lift) + 'px';
+        inplace.style.width = Math.round(box.width) + 'px';
+        inplace.style.setProperty('--sie-inplace-height', inplaceGeom.height + 'px');
+    }
+
+    function closeInplace() {
+        if (!inplaceFor) return;
+
+        window.removeEventListener('resize', positionInplace);
+
+        inplaceFor.style.visibility = inplaceVisibility;
+        inplace.hidden = true;
+        inplace.classList.remove('sie-inplace-measuring');
+        inplace.removeAttribute('style');
+        inplaceFrame.removeAttribute('src');
+
+        if (inplace.parentNode) inplace.parentNode.removeChild(inplace);
+
+        inplaceFor = null;
+        inplaceGeom = null;
+        paint();
+
+        // Whatever happened in there happened to the entry, not to this page.
+        // Reloading is the only honest way to show it — the template decides
+        // what a Bard looks like out here, and the editor never saw that.
+        window.location.reload();
+    }
+
+    window.addEventListener('message', function (event) {
+        if (!inplaceFrame.contentWindow || event.source !== inplaceFrame.contentWindow) return;
+
+        var data = event.data;
+
+        if (!data || data.source !== 'statamic-inline-edit') return;
+
+        if (data.type === 'ready') {
+            // Appearance only, and only to the frame we just opened.
+            // `/` rather than the origin spelled out: it means "only if the
+            // frame is still same-origin with this page", which is the check
+            // that matters, and it is the one form that is also valid on a
+            // page with an opaque origin.
+            inplaceFrame.contentWindow.postMessage(
+                { source: 'statamic-inline-edit-host', type: 'styles', css: inplaceCss },
+                '/'
+            );
+
+            return;
+        }
+
+        if (data.type === 'height') {
+            placeInplace(data);
+
+            return;
+        }
+
+        if (data.type === 'saved' || data.type === 'close') closeInplace();
+    });
+
+    /**
+     * The page's own typography, as rules the editor can wear.
+     *
+     * Not a copy of the site's stylesheet: loading that into the frame would
+     * put the site's reset through the control panel's own interface, and a
+     * Tailwind preflight is perfectly capable of flattening every button in
+     * it. What travels is the *result* — the computed style of this element
+     * and of one probe for each kind of block a Bard can make, read here,
+     * where the cascade has already happened.
+     *
+     * The probes are real elements, inserted in the real place, because that
+     * is the only way to find out what `.prose h2` or `article ul > li` add up
+     * to. They are absolutely positioned and invisible, so nothing moves while
+     * they are in, and they are gone before this function returns.
+     *
+     * Best-effort throughout. A page that throws here should lose its fonts in
+     * the editor, not its editor.
+     */
+    var PROBES = [
+        ['', ''],
+        ['p', 'p'],
+        ['h2', 'h2'],
+        ['h3', 'h3'],
+        ['h4', 'h4'],
+        ['ul', 'ul'],
+        ['ol', 'ol'],
+        ['ul>li', 'li'],
+        ['blockquote', 'blockquote'],
+        ['a', 'a'],
+        ['strong', 'strong'],
+        ['em', 'em'],
+        ['code', 'code'],
+        ['hr', 'hr']
+    ];
+
+    /** What every probe reports. Anything a reader would notice as a change. */
+    var TYPE_PROPS = [
+        'font-family', 'font-size', 'font-weight', 'font-style', 'font-variant',
+        'line-height', 'letter-spacing', 'word-spacing', 'text-transform',
+        'text-align', 'color', 'margin-top', 'margin-bottom'
+    ];
+
+    /** And what only some of them do. */
+    var EXTRA_PROPS = {
+        ul: ['padding-inline-start', 'list-style-type', 'list-style-position'],
+        ol: ['padding-inline-start', 'list-style-type', 'list-style-position'],
+        li: ['padding-inline-start', 'margin-left'],
+        blockquote: [
+            'border-left-width', 'border-left-style', 'border-left-color',
+            'padding-left', 'padding-top', 'padding-right', 'padding-bottom',
+            'background-color', 'border-radius', 'quotes'
+        ],
+        a: ['text-decoration-line', 'text-decoration-color', 'text-decoration-thickness', 'text-underline-offset'],
+        code: ['background-color', 'padding-left', 'padding-right', 'padding-top', 'padding-bottom', 'border-radius'],
+        hr: ['border-top-width', 'border-top-style', 'border-top-color']
+    };
+
+    function typography(node) {
+        try {
+            return snapshot(node);
+        } catch (e) {
+            return '';
+        }
+    }
+
+    /**
+     * What has to go, wherever this frame is.
+     *
+     * Sent with the typography rather than living in the control panel bundle,
+     * because it belongs to the same job: this is the list of surfaces the
+     * control panel draws *because it is a control panel*, and every one of
+     * them is a seam where the frame stops looking like the page.
+     *
+     * Matched by structure, not by class name. Core's markup is core's to
+     * change, and the only thing certain about it is that the element holding
+     * the editor is ProseMirror's parent.
+     */
+    var CHROME_OFF = [
+        // The field's own header — its label, its instructions, its handle
+        // buttons. Read out of the markup rather than guessed at: the header
+        // is the first child of the field group that has a label in it, and
+        // that is true of every fieldtype rather than of Bard in particular.
+        // On the page the heading above the text already says what this is.
+        '.sie-cp-inplace .form-group > :first-child:has(label){display:none !important}',
+        '.sie-cp-inplace :where(label){display:none !important}',
+
+        // The box. A control panel draws one so that a Bard can be told apart
+        // from the Grid under it; in an article there is nothing to tell it
+        // apart from, and the border is simply a rectangle around a paragraph.
+        '.sie-cp-inplace :is(.bard-fieldtype,.bard-editor){' +
+            'background:transparent !important;border:0 !important;border-radius:0 !important;' +
+            'box-shadow:none !important}',
+
+        // And whatever holds the editor, for a fieldtype whose classes are
+        // not these. Structure is the one thing core cannot change here: the
+        // editor's parent is the editor's parent.
+        '.sie-cp-inplace :where(div,section,fieldset):has(> .ProseMirror){' +
+            'background:transparent !important;border:0 !important;border-radius:0 !important;' +
+            'box-shadow:none !important;padding:0 !important}',
+
+        '.sie-cp-inplace .ProseMirror{padding:0 !important;min-height:0 !important;' +
+            'background:transparent !important;border-radius:0 !important;outline:none !important}',
+
+        // The toolbar stays — it is most of the reason to open a Bard at all —
+        // but it stops being a bar across the top of a panel. A full-width
+        // rule above the first paragraph reads as a divider in the article,
+        // which is exactly the thing this mode exists to avoid. As wide as its
+        // buttons, rounded, lifted off the text.
+        //
+        // ponytail: it scrolls away with the page on a long article, because a
+        // frame cannot stick to its parent's viewport. Keyboard shortcuts and
+        // the markdown input rules still work. Move the toolbar into the host
+        // page if that stops being good enough.
+        '.sie-cp-inplace .bard-fixed-toolbar{' +
+            'position:sticky !important;top:8px !important;z-index:5 !important;' +
+            'width:fit-content !important;max-width:100% !important;' +
+            'border:0 !important;border-radius:8px !important;margin:0 0 12px !important;' +
+            'box-shadow:0 6px 20px rgb(0 0 0 / 12%),0 0 0 1px rgb(0 0 0 / 8%) !important}',
+
+        // Save and Close, as the same light floating panel. This addon already
+        // settled that question once, for the selection toolbar: docked is
+        // dark, floating over the content is a light panel. Two floating
+        // panels in two styles on one page is the thing that reads as "some
+        // other application is on top of my site".
+        '.sie-cp-inplace .sie-cp-actions{' +
+            'width:fit-content !important;margin:12px 0 0 auto !important;padding:6px !important;' +
+            'border-radius:10px !important;background:#fff !important;' +
+            'box-shadow:0 6px 20px rgb(0 0 0 / 12%),0 0 0 1px rgb(0 0 0 / 8%) !important}',
+
+        // And the primary in this addon's own blue rather than the control
+        // panel's indigo — the same blue as the outline around every editable
+        // field on the page, so the one button that writes is the one colour
+        // the page has been using for editing all along.
+        '.sie-cp-inplace .sie-cp-actions > :last-child{' +
+            'background:#3b82f6 !important;border-color:#3b82f6 !important;color:#fff !important}'
+    ].join('\n');
+
+    function snapshot(node) {
+        var made = [];
+        var rules = [CHROME_OFF];
+
+        PROBES.forEach(function (probe) {
+            var path = probe[0];
+            var selector = probe[1];
+
+            var target = node;
+
+            if (path !== '') {
+                var host = node;
+                var parts = path.split('>');
+                var built = null;
+
+                parts.forEach(function (name) {
+                    var el = document.createElement(name);
+
+                    // Content, because an empty inline element has no font
+                    // size worth reading and a list item with nothing in it
+                    // collapses. A single character is enough and never seen.
+                    el.textContent = 'x';
+
+                    if (name === 'a') el.setAttribute('href', '#');
+
+                    host.appendChild(el);
+
+                    if (!built) built = el;
+
+                    host = el;
+                });
+
+                // Out of the flow, so a page in mid-scroll does not twitch
+                // while this runs. Important, because a site that lays out
+                // its own list items is entitled to !important of its own.
+                built.style.setProperty('position', 'absolute', 'important');
+                built.style.setProperty('visibility', 'hidden', 'important');
+                built.style.setProperty('pointer-events', 'none', 'important');
+
+                made.push(built);
+                target = host;
+            }
+
+            var computed = window.getComputedStyle(target);
+            var props = TYPE_PROPS.concat(EXTRA_PROPS[selector] || EXTRA_PROPS[path] || []);
+            var body = [];
+
+            props.forEach(function (prop) {
+                var value = computed.getPropertyValue(prop);
+
+                if (!value || value === 'none' && prop === 'quotes') return;
+
+                body.push(prop + ':' + value + ' !important');
+            });
+
+            if (!body.length) return;
+
+            // `!important` on every line, and the scope kept short on purpose.
+            // This blob exists to beat the control panel's own type styles,
+            // which are more specific than anything an addon can write without
+            // knowing core's markup by heart.
+            rules.push(
+                '.sie-cp-inplace .ProseMirror' + (selector ? ' ' + selector : '') +
+                '{' + body.join(';') + '}'
+            );
+        });
+
+        made.forEach(function (el) {
+            if (el.parentNode) el.parentNode.removeChild(el);
+        });
+
+        // The column is the frame's now. A max-width measured off the page
+        // would be applied twice and make the text narrower than it reads.
+        rules.push('.sie-cp-inplace .ProseMirror{max-width:none !important}');
+
+        return rules.join('\n');
     }
 
     /* ------------------------------------------------------ control panel */
@@ -1191,6 +1604,7 @@
 
     document.addEventListener('keydown', function (event) {
         if (event.key !== 'Escape') return;
+        if (inplaceFor) { closeInplace(); return; }
         if (!panel.hidden) { closePanel(); return; }
         if (!pop.hidden) { closePop(); return; }
         closeAllRich();

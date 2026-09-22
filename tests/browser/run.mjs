@@ -13,6 +13,8 @@
 import { chromium } from 'playwright-core';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
+import { createServer } from 'node:http';
+import { readFile } from 'node:fs/promises';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const PAGE = 'file://' + resolve(here, 'fixture.html');
@@ -823,7 +825,222 @@ check(
 );
 check('which is what lands on the page', (await body.innerText()).includes('Vom Server'));
 
+/* ------------------------------------------------- a Bard, where it stands */
+
+console.log('\nthe field in place');
+
+/**
+ * Over HTTP, unlike everything above it.
+ *
+ * Two documents loaded from `file://` get an opaque origin each, and two
+ * opaque origins are never the same origin. The frame and the page could
+ * therefore not talk at all, and the typography — the whole reason this mode
+ * exists — would have had no way of arriving. A test that cannot exercise the
+ * path it is named after is worse than no test: it goes green forever.
+ */
+const root = resolve(here, '../..');
+
+const server = createServer((request, response) => {
+    const name = (request.url || '/').split('?')[0].replace(/^\/+/, '');
+    const file = resolve(root, name);
+
+    // Rooted at the repository, so the fixture's own `../../resources/dist`
+    // resolves the way it does on disk. Anything above it is not ours to
+    // serve, however the request spells it.
+    if (! file.startsWith(root + '/')) {
+        response.writeHead(403);
+        response.end('no');
+
+        return;
+    }
+
+    readFile(file)
+        .then((body) => {
+            response.writeHead(200, {
+                'Content-Type': file.endsWith('.css') ? 'text/css'
+                    : file.endsWith('.js') ? 'text/javascript'
+                        : 'text/html; charset=utf-8',
+            });
+            response.end(body);
+        })
+        .catch(() => {
+            response.writeHead(404);
+            response.end('not found');
+        });
+});
+
+await new Promise((done) => server.listen(0, '127.0.0.1', done));
+
+const PAGE_INPLACE = 'http://127.0.0.1:' + server.address().port + '/tests/browser/fixture-inplace.html';
+
+await page.goto(PAGE_INPLACE);
+
+// Closing asks the page for the truth, and that really is a reload — the
+// template decides what a Bard looks like out here and the editor never saw
+// it. `location.reload` cannot be stubbed (its properties are unforgeable, so
+// defineProperty throws), so the navigation itself is what gets counted.
+let loads = 0;
+page.on('load', () => { loads++; });
+
+const field = page.locator('[data-sie-field="content"]');
+const inplaceFrame = page.locator('.sie-inplace-frame');
+
+// In document coordinates, not viewport ones. Opening the field scrolls it
+// into view, and a viewport measurement taken before and after would report
+// that scroll as movement — which is exactly the failure this section is
+// supposed to catch, in the one form where it is not a failure at all.
+const absTop = (locator) => locator.evaluate((el) => Math.round(el.getBoundingClientRect().top + window.scrollY));
+
+const beforeBox = await field.boundingBox();
+const beforeTop = await absTop(field);
+const afterBefore = await absTop(page.locator('.after'));
+
+// The edit mode is remembered across pages, and the tests above left it on.
+// Clicking the launcher blindly would turn it off again.
+if (! await page.evaluate(() => document.documentElement.classList.contains('sie-editing'))) {
+    await page.locator('.sie-launch').click();
+}
+
+await page.waitForTimeout(150);
+
+check('a bard is marked as its own kind', (await field.getAttribute('data-sie-badge')) === 'Editor');
+
+await field.dblclick();
+await page.waitForTimeout(600);
+
+check('no card opens over the page', await page.locator('.sie-panel').evaluate((el) => el.hidden));
+check('the frame stands over the content instead', (await inplaceFrame.count()) === 1);
+
+// Hidden, but still holding its box. Taking it out of the flow would close the
+// gap its first child's margin collapsed out through it, and the article below
+// would slide up by that margin.
+check('and the block it replaced is hidden, not removed', await field.evaluate((el) => {
+    const style = getComputedStyle(el);
+
+    return style.visibility === 'hidden' && style.display !== 'none' && el.getBoundingClientRect().height > 0;
+}));
+
+const frameBox = await inplaceFrame.boundingBox();
+
+check(
+    'at the width the content had',
+    Math.abs(frameBox.width - beforeBox.width) <= 1,
+    'was ' + Math.round(beforeBox.width) + ', is ' + Math.round(frameBox.width)
+);
+check(
+    'and in the same place on the page',
+    Math.abs(frameBox.x - beforeBox.x) <= 1,
+    'was ' + Math.round(beforeBox.x) + ', is ' + Math.round(frameBox.x)
+);
+check(
+    'taller than the block, because it carries a toolbar and buttons',
+    frameBox.height > beforeBox.height + 40,
+    'block ' + Math.round(beforeBox.height) + ', frame ' + Math.round(frameBox.height)
+);
+
+// The finding that sent the first version back: the toolbar and the buttons
+// were in the flow, so opening the editor shoved the rest of the article down
+// the screen — starting with the paragraph that had just been double-clicked.
+const afterOpen = await absTop(page.locator('.after'));
+
+check(
+    'and nothing below it moved when it opened',
+    Math.abs(afterOpen - afterBefore) <= 1,
+    'was ' + afterBefore + ', is ' + afterOpen
+);
+
+// Which only works because the text inside the frame lands on the line the
+// text outside it was on. The frame is pulled up by however far into the form
+// the editor starts, and that is a number the form has to send.
+const frameTop = await absTop(inplaceFrame);
+const editorTop = await page.frameLocator('.sie-inplace-frame').locator('.ProseMirror').first().evaluate(
+    (el) => Math.round(el.getBoundingClientRect().top)
+);
+
+check(
+    'and the text starts on the line it started on',
+    Math.abs((frameTop + editorTop) - beforeTop) <= 2,
+    'was ' + beforeTop + ', is ' + (frameTop + editorTop)
+);
+
+// Nothing painted behind it: the page's own background has to reach the text
+// being edited, or the column ends at the edge of the frame.
+check(
+    'with nothing painted behind it',
+    (await inplaceFrame.evaluate((el) => getComputedStyle(el).backgroundColor)) === 'rgba(0, 0, 0, 0)'
+);
+
+const inner = page.frameLocator('.sie-inplace-frame');
+
+check('the page hands over its own type', (await inner.locator('#sie-page-styles').count()) === 1);
+
+const innerParagraph = await inner.locator('.ProseMirror p').first().evaluate((el) => {
+    const style = getComputedStyle(el);
+
+    return { family: style.fontFamily, size: style.fontSize };
+});
+
+check(
+    'so a paragraph in the editor is the page\'s paragraph',
+    innerParagraph.family.includes('Georgia') && innerParagraph.size === '18px',
+    JSON.stringify(innerParagraph)
+);
+
+const innerHeading = await inner.locator('.ProseMirror h2').first().evaluate((el) => getComputedStyle(el).fontSize);
+
+check(
+    'and a heading is the page\'s heading, not the panel\'s',
+    innerHeading === '28px',
+    'h2 is ' + innerHeading
+);
+
+check(
+    'even the list marker comes along',
+    (await inner.locator('.ProseMirror ul').first().evaluate((el) => getComputedStyle(el).listStyleType)) === 'square'
+);
+
+// The box the control panel draws around a field is the thing that made this
+// look like a form on a page rather than the page.
+check(
+    'and the box around the field is gone',
+    await inner.locator('.field-box').evaluate((el) => {
+        const style = getComputedStyle(el);
+
+        return style.borderTopWidth === '0px' && style.backgroundColor === 'rgba(0, 0, 0, 0)';
+    })
+);
+
+// One Save on the screen, not two. The bar belongs to the other fields, and
+// while this is open there is exactly one thing that can be saved.
+check('and the page\'s own bar steps aside', await bar.evaluate((el) => el.hidden));
+
+check('nothing was reloaded while it was open', loads === 0, 'loads: ' + loads);
+
+// Escape from the page, not from inside the frame: the frame has its own
+// handler, and this is the one for when focus is back out here.
+//
+// Clicked above the field rather than below it. The frame hangs over what is
+// under the article, because that is where its buttons are, and an iframe
+// cannot let a click through part of itself.
+await page.locator('body').click({ position: { x: 5, y: 5 } });
+await page.keyboard.press('Escape');
+await page.waitForLoadState('load');
+await page.waitForTimeout(200);
+
+check('Escape puts the content back', await field.evaluate((el) => getComputedStyle(el).visibility !== 'hidden'));
+check('and takes the frame with it', (await page.locator('.sie-inplace-frame').count()) === 0);
+check('and asks the page for the truth', loads === 1, 'loads: ' + loads);
+
+const afterAfter = await absTop(page.locator('.after'));
+
+check(
+    'and what stood below it stands where it stood',
+    Math.abs(afterAfter - afterBefore) <= 1,
+    'was ' + afterBefore + ', is ' + afterAfter
+);
+
 await browser.close();
+server.close();
 
 console.log('');
 

@@ -403,6 +403,7 @@
    over the page. The cursor should say which. */
 .sie-editing [data-sie-field][data-sie-mode="control"],
 .sie-editing [data-sie-field][data-sie-mode="source"],
+.sie-editing [data-sie-field][data-sie-mode="inline"],
 .sie-editing [data-sie-field][data-sie-mode="cp"] {
     cursor: pointer;
 
@@ -925,6 +926,64 @@
     /* Whatever the form says, it never grows past the window. Past that
        point the frame scrolls, which is the browser's job and not ours. */
     max-height: calc(100vh - 32px);
+}
+
+/* ---------------------------------------------- the field, in place
+
+   The frame stands where the content stood. Deliberately almost nothing here:
+   every rule is a chance for this box to differ from the block it replaced,
+   and the whole point is that the column does not move when it appears.
+
+   No reset, unlike the overlay below. `all: unset` on a wrapper that sits in
+   somebody's article would take away the width it inherits, and the width is
+   the one thing that has to survive. */
+
+/* Over the block it is editing, in document coordinates, out of the flow.
+
+   Never in the flow. A block's children can collapse their margins out through
+   it; an iframe has no children and cannot, so a frame put in a block's place
+   closes the gap above it and slides the rest of the article up. Sitting over
+   the block instead, with the block still holding its box, means the page is
+   laid out exactly as it was. */
+.sie-inplace {
+    position: absolute;
+    display: block;
+    margin: 0;
+    padding: 0;
+    /* Over the page, under the editor's own bar and its popover. */
+    z-index: 2147483000;
+}
+
+.sie-inplace[hidden] { display: none; }
+
+/* Loaded, laid out and measured before it is in the page at all.
+
+   A form cannot be asked how tall it is until it has rendered, and rendering
+   takes a beat. In the page, that beat is a hole where the article was. Out of
+   the flow it costs nothing and nobody sees it — and the width is set
+   explicitly, because a form measured at the wrong width reports a height for
+   lines that break somewhere else. */
+.sie-inplace.sie-inplace-measuring {
+    left: -10000px;
+    top: 0;
+    opacity: 0;
+    pointer-events: none;
+}
+
+.sie-inplace .sie-inplace-frame {
+    display: block;
+    width: 100%;
+    /* As tall as the whole form: toolbar, text, buttons. The wrapper is placed
+       so that the text inside lands on the line the text outside was on, and
+       the chrome hangs over what is above and below — which is where floating
+       chrome belongs. The frame paints nothing, so the page shows through
+       everywhere the chrome is not. */
+    height: var(--sie-inplace-height, 320px);
+    margin: 0;
+    border: 0;
+    padding: 0;
+    background: transparent;
+    color-scheme: normal;
 }
 
 /* While the server is rendering the preview. Brief, and only ever on a
