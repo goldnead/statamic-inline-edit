@@ -33,16 +33,25 @@
 <body>
 
 <div class="sie-cp-field sie-cp-inplace">
-    <!-- A toolbar above the text and buttons below it, like the real form.
-         They are the reason the frame is taller than the article's block, and
-         a stub without them could not show that the page stays put. -->
-    <div class="bard-fixed-toolbar">B  I  H2</div>
+    <!-- The same nesting the real form has, because the rules that arrive
+         from the page are written for it: the toolbar is core's markup inside
+         core's wrapper, and a flex column is what moves it under the text
+         without either being touched. A stub with a flatter shape would let a
+         broken selector pass. -->
+    <div class="bard-fieldtype">
+        <div class="bard-editor">
+            <div class="bard-fixed-toolbar">B  I  H2</div>
 
-    <div class="field-box">
-        <div class="ProseMirror" contenteditable="true">
-            <h2>Eine Überschrift</h2>
-            <p>Ein Absatz, der aussehen soll wie auf der Seite.</p>
-            <ul><li>Ein Punkt</li></ul>
+            <div class="field-box">
+                <div class="ProseMirror" contenteditable="true">
+                    <h2>Eine Überschrift</h2>
+                    <!-- Word for word what the page shows, because the check
+                         outside measures where the first line breaks in both
+                         and they have to break in the same place. -->
+                    <p class="measured">Technik ist ein Durchgangsstadium und kein Ziel. Wer die Stimme einmal verstanden hat, hört im Chor plötzlich, woran es liegt.</p>
+                    <ul><li>Ein Punkt</li></ul>
+                </div>
+            </div>
         </div>
     </div>
 

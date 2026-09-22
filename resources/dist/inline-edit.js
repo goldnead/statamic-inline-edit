@@ -26,6 +26,43 @@
         return;
     }
 
+    /**
+     * Wait for the markers if they are not in the HTML yet.
+     *
+     * On an Antlers site they always are: the page arrives rendered and this
+     * script runs after it. A site drawn by React or Vue sends an empty root
+     * and a blob of props, and the markers appear when the application mounts
+     * — which is after a deferred script has run. Reading the document once
+     * and giving up found nothing there, and the editor simply never appeared
+     * on exactly the pages it had been installed for.
+     *
+     * ponytail: this waits for the first markers, not for every later set. A
+     * client-side navigation to another page inside the same application
+     * replaces them, and this does not notice. Reload, or call the boot again
+     * from your router if that stops being good enough.
+     */
+    if (document.querySelector('[data-sie-field]')) {
+        start();
+    } else {
+        var waiting = new MutationObserver(function () {
+            if (!document.querySelector('[data-sie-field]')) return;
+
+            stopWaiting();
+            start();
+        });
+
+        var giveUp = setTimeout(stopWaiting, 15000);
+
+        waiting.observe(document.documentElement, { childList: true, subtree: true });
+    }
+
+    function stopWaiting() {
+        clearTimeout(giveUp);
+        waiting.disconnect();
+    }
+
+    function start() {
+
     var L = config.labels || {};
     var nodes = Array.prototype.slice.call(document.querySelectorAll('[data-sie-field]'));
     if (!nodes.length) return;
@@ -771,6 +808,46 @@
     /** What the form last said about itself: total height, and where its text starts. */
     var inplaceGeom = null;
 
+    /**
+     * The room the controls need, made in the page rather than taken from it.
+     *
+     * The frame is taller than the block, because under the text there is a
+     * toolbar and two buttons. Left to hang, they cover the next paragraph —
+     * and a control that deletes what it covers is not chrome, it is damage.
+     * So the page is asked to make exactly that much room, once, under the
+     * block, and it grows as the text does.
+     */
+    var inplaceSpacer = document.createElement('div');
+    inplaceSpacer.className = 'sie-inplace-spacer';
+    inplaceSpacer.setAttribute('aria-hidden', 'true');
+
+    /**
+     * What putting anything there costs before it is even tall.
+     *
+     * An element between two paragraphs is not free: the margins that used to
+     * collapse into one another now have something between them, and the gap
+     * grows by the smaller of the two. Sixteen pixels on the test page.
+     *
+     * Measured with a height on it, not without. An empty block lets the
+     * margins collapse straight through and costs exactly nothing — which is
+     * the answer to a different question than the one being asked.
+     */
+    var inplaceSpacerCost = 0;
+
+    var SPACER_PROBE = 100;
+
+    function addSpacer() {
+        var parent = inplaceFor.parentNode;
+        var before = parent.getBoundingClientRect().height;
+
+        inplaceSpacer.style.height = SPACER_PROBE + 'px';
+        parent.insertBefore(inplaceSpacer, inplaceFor.nextSibling);
+
+        var grew = parent.getBoundingClientRect().height - before;
+
+        inplaceSpacerCost = Math.max(0, Math.round(grew - SPACER_PROBE));
+    }
+
     function openInplace(node) {
         // Without the one-field route there is only the whole entry form, and
         // that cannot stand in an article's column. The card still can.
@@ -852,6 +929,8 @@
             inplaceVisibility = inplaceFor.style.visibility;
             inplaceFor.style.setProperty('visibility', 'hidden', 'important');
 
+            addSpacer();
+
             positionInplace();
             inplaceFrame.focus();
 
@@ -864,18 +943,28 @@
     function positionInplace() {
         if (!inplaceFor || !inplaceGeom) return;
 
+        // The room under the block first, then the position. In that order:
+        // the spacer changes the layout, and a position measured before it
+        // took effect describes a page that no longer exists.
+        var height = inplaceGeom.height;
+
+        inplaceSpacer.style.height = Math.max(0, height - inplaceFor.offsetHeight - inplaceSpacerCost) + 'px';
+
         var box = inplaceFor.getBoundingClientRect();
 
         inplace.style.left = Math.round(box.left + window.scrollX) + 'px';
         inplace.style.top = Math.round(box.top + window.scrollY - inplaceGeom.lift) + 'px';
         inplace.style.width = Math.round(box.width) + 'px';
-        inplace.style.setProperty('--sie-inplace-height', inplaceGeom.height + 'px');
+        inplace.style.setProperty('--sie-inplace-height', height + 'px');
     }
 
     function closeInplace() {
         if (!inplaceFor) return;
 
         window.removeEventListener('resize', positionInplace);
+
+        if (inplaceSpacer.parentNode) inplaceSpacer.parentNode.removeChild(inplaceSpacer);
+        inplaceSpacer.style.height = '';
 
         inplaceFor.style.visibility = inplaceVisibility;
         inplace.hidden = true;
@@ -964,7 +1053,24 @@
     var TYPE_PROPS = [
         'font-family', 'font-size', 'font-weight', 'font-style', 'font-variant',
         'line-height', 'letter-spacing', 'word-spacing', 'text-transform',
-        'text-align', 'color', 'margin-top', 'margin-bottom'
+        'text-align', 'color', 'margin-top', 'margin-bottom',
+
+        // Where a line breaks is not only a question of width. A page that
+        // asks the browser to balance its paragraphs, or to hyphenate them,
+        // breaks them somewhere else than one that does not — and a line that
+        // breaks one word earlier in the editor than on the page is the whole
+        // promise of this mode broken, in the most visible way there is.
+        'text-wrap', 'hyphens', 'word-break', 'overflow-wrap',
+
+        // And the metrics, which decide the same thing one word at a time.
+        // Measured on the demo: the same sentence set five pixels narrower in
+        // the editor than on the page, enough for the next word to climb into
+        // the line above. Inter is a variable font and the control panel asks
+        // it for different numbers than the site does — optical size, kerning
+        // and the feature set are all live settings, not decoration.
+        'font-variation-settings', 'font-feature-settings', 'font-optical-sizing',
+        'font-kerning', 'font-stretch', 'font-synthesis', 'text-rendering',
+        'font-variant-ligatures', 'font-size-adjust'
     ];
 
     /** And what only some of them do. */
@@ -988,6 +1094,153 @@
         } catch (e) {
             return '';
         }
+    }
+
+    /**
+     * The page's own font files, renamed so they cannot be confused with the
+     * control panel's.
+     *
+     * Copying every property of a paragraph and still measuring it two and a
+     * half pixels narrower in the frame is not a property that was missed. It
+     * is a different font: the control panel ships its own Inter and so does
+     * half the web, the family name is the same, and `font-family: Inter` in
+     * the frame therefore asks for a different file than the same words ask
+     * for out here. Two builds of a typeface do not have the same advances,
+     * and over a line that is a word moving to the row above.
+     *
+     * So the `@font-face` rules the page really loaded travel with the
+     * typography, under a name nothing else can claim, and the rules that
+     * follow ask for that name.
+     *
+     * Best-effort by construction: a stylesheet from another origin — Google
+     * Fonts, a CDN — will not let its rules be read, and those families keep
+     * their own name and whatever the frame makes of it. Better one family
+     * right than an exception on somebody's live page.
+     *
+     * @return array{0: string, 1: Object} the @font-face rules, and old name → new
+     */
+    /**
+     * Hosts that serve nothing but font declarations.
+     *
+     * A stylesheet from another origin cannot be read, so its faces cannot be
+     * copied and renamed — but it can be asked for again from inside the
+     * frame, and then the page's own file is the last one declared for the
+     * family and wins. That is only safe where the sheet is known to contain
+     * font faces and nothing else. A CDN stylesheet of unknown content would
+     * be a whole framework's reset going through the control panel's
+     * interface, which is the failure this addon spends most of its CSS
+     * avoiding.
+     */
+    var FONT_HOSTS = [
+        'fonts.googleapis.com',
+        'fonts.bunny.net',
+        'use.typekit.net',
+        'api.fontshare.com',
+        'fonts.cdnfonts.com'
+    ];
+
+    function fontFaces(families) {
+        var css = [];
+        var imports = [];
+        var renamed = {};
+        var index = 0;
+
+        function maybeImport(href) {
+            if (!href) return;
+
+            var host;
+
+            try {
+                host = new URL(href, document.baseURI).hostname;
+            } catch (e) {
+                return;
+            }
+
+            if (FONT_HOSTS.indexOf(host) === -1) return;
+            if (imports.indexOf(href) === -1) imports.push(href);
+        }
+
+        Array.prototype.forEach.call(document.styleSheets, function (sheet) {
+            var rules;
+
+            try {
+                rules = sheet.cssRules;
+            } catch (e) {
+                // Another origin, and not ours to read. If it is a font host,
+                // the frame can ask for it itself.
+                maybeImport(sheet.href);
+
+                return;
+            }
+
+            if (!rules) return;
+
+            Array.prototype.forEach.call(rules, function (rule) {
+                // An @import in a sheet we can read, pointing at one we
+                // cannot. This is how a site loads Google Fonts from inside
+                // its own bundle, and the href is right there even though the
+                // rules behind it are not.
+                if (window.CSSImportRule && rule instanceof window.CSSImportRule) {
+                    var readable = false;
+
+                    try {
+                        readable = !!(rule.styleSheet && rule.styleSheet.cssRules);
+                    } catch (e) {
+                        readable = false;
+                    }
+
+                    if (!readable) maybeImport(rule.href);
+
+                    return;
+                }
+
+                if (!(window.CSSFontFaceRule && rule instanceof window.CSSFontFaceRule)) return;
+
+                var family = unquote(rule.style.getPropertyValue('font-family'));
+
+                var key = (family || '').toLowerCase();
+
+                if (!key || families.indexOf(key) === -1) return;
+
+                if (!renamed[key]) renamed[key] = 'sie-font-' + (index++);
+
+                css.push(
+                    rule.cssText
+                        .replace(/font-family\s*:\s*[^;}]+/i, 'font-family: "' + renamed[key] + '"')
+                        .replace(/url\(\s*(['"]?)([^'")]+)\1\s*\)/gi, function (all, quote, href) {
+                            return 'url("' + absolute(href, sheet.href) + '")';
+                        })
+                );
+            });
+        });
+
+        // Imports first, always: a browser ignores an @import that is not at
+        // the top of its sheet, and then the font never arrives and nothing
+        // says why.
+        var head = imports.map(function (href) {
+            return '@import url("' + href + '");';
+        }).join('\n');
+
+        return [head + (head && css.length ? '\n' : '') + css.join('\n'), renamed];
+    }
+
+    function unquote(value) {
+        return (value || '').trim().replace(/^['"]|['"]$/g, '');
+    }
+
+    function absolute(href, base) {
+        try {
+            return new URL(href, base || document.baseURI).href;
+        } catch (e) {
+            return href;
+        }
+    }
+
+    /** The families a value asks for, lower-cased, in order. */
+    function familiesIn(value) {
+        return (value || '').split(',').map(function (name) {
+            return unquote(name).toLowerCase();
+        }).filter(Boolean);
     }
 
     /**
@@ -1028,31 +1281,41 @@
         '.sie-cp-inplace .ProseMirror{padding:0 !important;min-height:0 !important;' +
             'background:transparent !important;border-radius:0 !important;outline:none !important}',
 
-        // The toolbar stays — it is most of the reason to open a Bard at all —
-        // but it stops being a bar across the top of a panel. A full-width
-        // rule above the first paragraph reads as a divider in the article,
-        // which is exactly the thing this mode exists to avoid. As wide as its
-        // buttons, rounded, lifted off the text.
+        // The controls go under the text, in a strip of their own.
         //
-        // ponytail: it scrolls away with the page on a long article, because a
-        // frame cannot stick to its parent's viewport. Keyboard shortcuts and
-        // the markdown input rules still work. Move the toolbar into the host
-        // page if that stops being good enough.
-        '.sie-cp-inplace .bard-fixed-toolbar{' +
-            'position:sticky !important;top:8px !important;z-index:5 !important;' +
-            'width:fit-content !important;max-width:100% !important;' +
-            'border:0 !important;border-radius:8px !important;margin:0 0 12px !important;' +
-            'box-shadow:0 6px 20px rgb(0 0 0 / 12%),0 0 0 1px rgb(0 0 0 / 8%) !important}',
+        // They were floating over the page for one round, and that was worse
+        // than the problem it solved: the toolbar sat on top of another field
+        // and the buttons cut a line of the article in half. "Everything but
+        // the controls looks the same" cannot mean the controls delete what
+        // they cover.
+        //
+        // So: the text keeps its place to the pixel, and the page below makes
+        // room for one strip — a toolbar on the left, Save and Close on the
+        // right. That is what every editor on a page does, and the only thing
+        // that moves is what was below the part being written.
+        //
+        // `order` rather than moving anything: the toolbar is core's markup,
+        // inside core's wrapper, and a flex column can put it after its
+        // sibling without either of them being touched.
+        '.sie-cp-inplace{position:relative !important}',
 
-        // Save and Close, as the same light floating panel. This addon already
-        // settled that question once, for the selection toolbar: docked is
-        // dark, floating over the content is a light panel. Two floating
-        // panels in two styles on one page is the thing that reads as "some
-        // other application is on top of my site".
+        // The toolbar's own parent, found by the toolbar rather than by name:
+        // in Statamic 6 it is the `.bard-fieldtype` wrapper and the editor is
+        // its sibling, and naming the wrong one of the two puts the toolbar
+        // back on top of the text it was supposed to move out from under.
+        '.sie-cp-inplace :where(div):has(> .bard-fixed-toolbar){' +
+            'display:flex !important;flex-direction:column !important}',
+
+        '.sie-cp-inplace .bard-fixed-toolbar{' +
+            'order:2 !important;width:fit-content !important;max-width:100% !important;' +
+            'border:0 !important;border-radius:8px !important;margin:12px 0 0 !important;' +
+            'box-shadow:0 4px 14px rgb(0 0 0 / 10%),0 0 0 1px rgb(0 0 0 / 8%) !important}',
+
+        // Out of the flow and into the same strip, on the other side of it.
+        // Its own row would be a second strip and twice the room to make.
         '.sie-cp-inplace .sie-cp-actions{' +
-            'width:fit-content !important;margin:12px 0 0 auto !important;padding:6px !important;' +
-            'border-radius:10px !important;background:#fff !important;' +
-            'box-shadow:0 6px 20px rgb(0 0 0 / 12%),0 0 0 1px rgb(0 0 0 / 8%) !important}',
+            'position:absolute !important;right:0 !important;bottom:0 !important;' +
+            'margin:0 !important;padding:0 !important;gap:8px !important}',
 
         // And the primary in this addon's own blue rather than the control
         // panel's indigo — the same blue as the outline around every editable
@@ -1133,11 +1396,61 @@
             if (el.parentNode) el.parentNode.removeChild(el);
         });
 
-        // The column is the frame's now. A max-width measured off the page
-        // would be applied twice and make the text narrower than it reads.
-        rules.push('.sie-cp-inplace .ProseMirror{max-width:none !important}');
+        // The column, to the pixel, rather than "whatever the frame is".
+        //
+        // The frame is as wide as the block's border box; the text inside the
+        // block sits in its content box, which is narrower by whatever padding
+        // the block has. A few pixels either way is a line that breaks one
+        // word earlier or later than it will on the page, which is the one
+        // difference a writer sees immediately.
+        var computed = window.getComputedStyle(node);
+        var width = node.clientWidth
+            - parseFloat(computed.paddingLeft || '0')
+            - parseFloat(computed.paddingRight || '0');
 
-        return rules.join('\n');
+        rules.push(
+            '.sie-cp-inplace .ProseMirror{' +
+            'box-sizing:content-box !important;' +
+            'width:' + Math.max(0, Math.round(width)) + 'px !important;' +
+            'max-width:none !important}'
+        );
+
+        var css = rules.join('\n');
+
+        // Every family any of those rules asks for, then the ones this page
+        // actually carries a file for, renamed, and the rules pointed at the
+        // new names. Anything that could not be copied keeps its own name.
+        var wanted = [];
+
+        css.replace(/font-family\s*:\s*([^;}!]+)/gi, function (all, value) {
+            familiesIn(value).forEach(function (name) {
+                if (wanted.indexOf(name) === -1) wanted.push(name);
+            });
+
+            return all;
+        });
+
+        var faces = fontFaces(wanted);
+        var renamed = faces[1];
+
+        if (Object.keys(renamed).length) {
+            css = css.replace(/font-family\s*:\s*([^;}!]+)/gi, function (all, value) {  // eslint-disable-line
+                return 'font-family:' + value.split(',').map(function (name) {
+                    var match = renamed[unquote(name).toLowerCase()];
+
+                    // Both spellings, and the original kept behind it: if the
+                    // copied file fails to load for any reason, the page falls
+                    // back to what it would have had anyway.
+                    return match ? '"' + match + '",' + name : name;
+                }).join(',');
+            });
+
+        }
+
+        // Whether or not anything was renamed: a font host asked for again
+        // from inside the frame declares the page's own file last, and last
+        // is what a browser picks when two faces fit the same request.
+        return faces[0] ? faces[0] + '\n' + css : css;
     }
 
     /* ------------------------------------------------------ control panel */
@@ -1669,4 +1982,6 @@
     }
 
     setEditing(wasEditing);
+
+    }
 })();

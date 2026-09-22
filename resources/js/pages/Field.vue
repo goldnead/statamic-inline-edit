@@ -204,6 +204,12 @@ function onMessage(event) {
         // they arrived describe a layout that no longer exists — and the page
         // would put the text a few pixels off the line it belongs on.
         requestAnimationFrame(() => requestAnimationFrame(reportHeight));
+
+        // Once more when the fonts are in. The page's own font files may come
+        // with those rules, over the network, and until they land the text is
+        // set in whatever was here — a different height and different line
+        // breaks than the ones it will settle on.
+        document.fonts?.ready?.then(reportHeight);
     }
 }
 

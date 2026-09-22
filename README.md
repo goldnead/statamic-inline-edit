@@ -164,15 +164,22 @@ you double-clicked and of one probe for each kind of block a Bard can make, and 
 result to the editor. Your stylesheet is never loaded into the control panel, which would put
 your reset through its interface.
 
-Everything a control panel draws to tell one field from the next comes off — the box, the
-label, the instructions, the editor's padding and background. The toolbar becomes a floating
-panel as wide as its buttons, and Save and Close a second one, and the page's own bar steps
-aside while the field is open.
+The font is the page's own file, not the control panel's copy of the same family. Two builds of
+a typeface do not have the same advances, and over a line that is a word moving to the row
+above — so the `@font-face` rules the page really loaded travel with the typography, renamed,
+and where they cannot be read (a stylesheet from another origin, which is how most sites load
+Google Fonts) the frame asks that stylesheet for itself.
 
-Two things to know. The frame covers a band above and below the text while it is open, and a
-click there does not reach the page: an iframe cannot let a click through part of itself. And
-the block keeps the height it had, so the page does not reflow while the text grows — the frame
-covers more of what is under it, and the reload after saving puts it right.
+Everything a control panel draws to tell one field from the next comes off — the box, the
+label, the instructions, the editor's padding and background. The toolbar and the buttons sit
+in a strip under the text, and the page makes room for exactly that strip, so nothing is
+covered and nothing but what follows moves. The page's own bar steps aside while the field is
+open.
+
+Two things to know. The frame covers that strip's worth of space, and a click there does not
+reach the page: an iframe cannot let a click through part of itself. And the block keeps the
+height it had, so the page does not reflow while the text grows — the frame covers more of what
+is under it, and the reload after saving puts it right.
 
 Add or remove fieldtypes in `inline`. An entry under revisions gets the card instead, for the
 same reason it always did.

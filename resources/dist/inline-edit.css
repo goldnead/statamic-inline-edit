@@ -963,6 +963,18 @@
    the flow it costs nothing and nobody sees it — and the width is set
    explicitly, because a form measured at the wrong width reports a height for
    lines that break somewhere else. */
+/* The room the controls sit in, made under the block rather than taken from
+   the paragraph below it. Its height comes from the form, so it grows with
+   the text. */
+.sie-inplace-spacer {
+    display: block;
+    width: 100%;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    pointer-events: none;
+}
+
 .sie-inplace.sie-inplace-measuring {
     left: -10000px;
     top: 0;

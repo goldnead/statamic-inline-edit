@@ -1,5 +1,57 @@
 # Changelog
 
+## 1.5.1
+
+Three findings from the Gauntlet rounds that 1.5.0 shipped without. Each one is
+a case the first version could not see because nobody had opened it on a page
+that had the problem.
+
+### The controls had to stop covering the page
+
+They floated over the content, and what they floated over was another editable
+field and a line of the article. "Everything but the controls looks the same"
+cannot mean the controls delete what they cover.
+
+Now they sit in a strip under the text — toolbar on the left, Save and Close on
+the right — and the page makes room for exactly that strip. What that costs is
+measured rather than assumed: an element between two paragraphs stops their
+margins collapsing into one another, which is sixteen pixels the page would
+otherwise gain for nothing, so the strip takes it off its own height.
+
+The toolbar moves under the text through `order` on a flex column, so core's
+markup is not touched. It goes on the element that actually holds it, found
+through `:has(> .bard-fixed-toolbar)` — naming `.bard-editor` instead puts the
+toolbar straight back on top of the text it was meant to move out from under.
+
+### The editor sets the text in the page's own font file
+
+Every font property matched and the same sentence still measured two and a half
+pixels narrower in the frame, which over a line is a word climbing into the row
+above. It was not a property that was missed. The control panel ships its own
+Inter and so does half the web; `font-family: Inter` in the frame asks for a
+different file than the same words ask for on the page, and two builds of a
+typeface do not have the same advances.
+
+So the page's own `@font-face` rules travel with the typography, renamed so
+nothing can claim them, with their URLs made absolute. Where the rules cannot
+be read — a stylesheet from another origin, which is how most sites load Google
+Fonts — the frame asks that stylesheet for itself, and being declared last is
+what makes it win. Only from hosts that serve font declarations and nothing
+else; an unknown CDN stylesheet would be a whole framework's reset going
+through the control panel's interface.
+
+Measured after, not before: the same sentence, 264.59 pixels in both.
+
+### The markers do not have to be in the HTML yet
+
+A site drawn by React or Vue sends an empty root and a blob of props, and the
+markers appear when the application mounts — which is after a deferred script
+has run. Reading the document once and giving up found nothing, so the editor
+never appeared on exactly the pages the headless marker had been added for.
+
+It waits for them now, for fifteen seconds. A client-side navigation to another
+page inside the same application is not covered, and says so in the source.
+
 ## 1.5.0
 
 ### A Bard opens where it stands

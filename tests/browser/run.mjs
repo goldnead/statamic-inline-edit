@@ -891,8 +891,26 @@ const inplaceFrame = page.locator('.sie-inplace-frame');
 // supposed to catch, in the one form where it is not a failure at all.
 const absTop = (locator) => locator.evaluate((el) => Math.round(el.getBoundingClientRect().top + window.scrollY));
 
+/**
+ * Where the first line of a paragraph ends, in pixels.
+ *
+ * The one number that says whether the editor sets the text the way the page
+ * does. Everything else — font, size, leading, colour — can match and the
+ * line can still break one word earlier, which is what a writer sees first
+ * and what makes an editor feel like somewhere else.
+ */
+const firstLineEnd = (locator) => locator.evaluate((el) => {
+    const range = document.createRange();
+    range.selectNodeContents(el);
+
+    const rects = Array.from(range.getClientRects());
+
+    return rects.length ? { lines: rects.length, width: Math.round(rects[0].width) } : null;
+});
+
 const beforeBox = await field.boundingBox();
 const beforeTop = await absTop(field);
+const readingLine = await firstLineEnd(field.locator('p.measured'));
 const afterBefore = await absTop(page.locator('.after'));
 
 // The edit mode is remembered across pages, and the tests above left it on.
@@ -938,15 +956,26 @@ check(
     'block ' + Math.round(beforeBox.height) + ', frame ' + Math.round(frameBox.height)
 );
 
-// The finding that sent the first version back: the toolbar and the buttons
-// were in the flow, so opening the editor shoved the rest of the article down
-// the screen — starting with the paragraph that had just been double-clicked.
+// The finding that sent the second version back: the toolbar and the buttons
+// floated over the page, and what they floated over was another field and a
+// line of the article. A control that deletes what it covers is not chrome.
+//
+// So the page makes room for them, and the room is under the block — which
+// means what follows moves down by exactly the strip and not a pixel more,
+// and nothing is covered.
 const afterOpen = await absTop(page.locator('.after'));
+const frameBottom = (await absTop(inplaceFrame)) + frameBox.height;
 
 check(
-    'and nothing below it moved when it opened',
-    Math.abs(afterOpen - afterBefore) <= 1,
-    'was ' + afterBefore + ', is ' + afterOpen
+    'and the controls cover nothing that follows',
+    afterOpen >= frameBottom - 1,
+    'frame ends at ' + Math.round(frameBottom) + ', next paragraph starts at ' + afterOpen
+);
+
+check(
+    'and what follows moved by the strip and no more',
+    afterOpen > afterBefore && afterOpen - afterBefore <= frameBox.height - beforeBox.height + 2,
+    'moved ' + (afterOpen - afterBefore) + ', strip is ' + Math.round(frameBox.height - beforeBox.height)
 );
 
 // Which only works because the text inside the frame lands on the line the
@@ -992,6 +1021,19 @@ check(
     'and a heading is the page\'s heading, not the panel\'s',
     innerHeading === '28px',
     'h2 is ' + innerHeading
+);
+
+// The number the third Gauntlet round was sent back over: everything matched
+// and the line still broke one word earlier, because the control panel asks
+// the same variable font for a different optical size than the site does.
+const editingLine = await firstLineEnd(inner.locator('.ProseMirror p.measured'));
+
+check(
+    'and the first line breaks where it breaks on the page',
+    readingLine && editingLine && readingLine.lines > 1 &&
+        editingLine.lines === readingLine.lines &&
+        Math.abs(editingLine.width - readingLine.width) <= 1,
+    'reading ' + JSON.stringify(readingLine) + ', editing ' + JSON.stringify(editingLine)
 );
 
 check(
