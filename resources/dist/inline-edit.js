@@ -1294,6 +1294,17 @@
         '.sie-cp-inplace .ProseMirror{padding:0 !important;min-height:0 !important;' +
             'background:transparent !important;border-radius:0 !important;outline:none !important}',
 
+        // The paragraphs themselves wrap the way the page's paragraphs wrap.
+        //
+        // ProseMirror asks for `break-spaces` on its root, which measures a
+        // space sitting at a line break; an ordinary paragraph does not, so
+        // the same sentence in the same font at the same width holds one word
+        // less in the editor and the last word drops to a line of its own.
+        // Set on the blocks rather than on the root, so the editor keeps the
+        // rule it needs for the caret and the text gets the one the page has.
+        '.sie-cp-inplace .ProseMirror :where(p,h1,h2,h3,h4,h5,h6,li,blockquote)' +
+            '{white-space:normal !important}',
+
         // The controls go under the text, in a strip of their own.
         //
         // They were floating over the page for one round, and that was worse
