@@ -210,6 +210,45 @@ class InPlaceTest extends TestCase
     }
 
     #[Test]
+    public function a_site_that_draws_itself_can_have_the_editor_on_every_page(): void
+    {
+        // The page a router navigates *from* has no marker on it, and the page
+        // it navigates *to* never reaches this middleware — the response there
+        // is JSON. Without the script already in the document, the markers
+        // that arrive with that navigation have nothing to act on them, and
+        // double-clicking does nothing at all, silently.
+        config()->set('statamic-inline-edit.inject_for_signed_in', true);
+
+        $this->actingAs($this->anEditor());
+
+        $this->get('/nichts-zu-bearbeiten')
+            ->assertOk()
+            ->assertHeader('X-Statamic-Uncacheable', 'true')
+            ->assertSee('statamic-inline-edit-config', false);
+    }
+
+    #[Test]
+    public function and_a_visitor_still_gets_nothing_on_that_page(): void
+    {
+        config()->set('statamic-inline-edit.inject_for_signed_in', true);
+
+        $response = $this->get('/nichts-zu-bearbeiten')->assertOk();
+
+        $response->assertDontSee('statamic-inline-edit-config', false);
+        $this->assertNull($response->headers->get('X-Statamic-Uncacheable'));
+    }
+
+    #[Test]
+    public function off_by_default_a_page_without_markers_stays_untouched(): void
+    {
+        $this->actingAs($this->anEditor());
+
+        $this->get('/nichts-zu-bearbeiten')
+            ->assertOk()
+            ->assertDontSee('statamic-inline-edit-config', false);
+    }
+
+    #[Test]
     public function the_route_groups_the_editor_rides_on_come_from_the_config(): void
     {
         $groups = app('router')->getMiddlewareGroups();

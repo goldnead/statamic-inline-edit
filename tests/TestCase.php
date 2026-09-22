@@ -29,6 +29,18 @@ abstract class TestCase extends AddonTestCase
     }
 
     /**
+     * A page with nothing editable on it, in the group the editor rides on.
+     *
+     * Testbench collects these before the application boots; a route declared
+     * inside a test body arrives after the router has made up its mind and
+     * answers 404.
+     */
+    protected function defineRoutes($router): void
+    {
+        $router->middleware('statamic.web')->get('/nichts-zu-bearbeiten', fn () => '<html><body>Liste</body></html>');
+    }
+
+    /**
      * A collection with a blueprint that covers the cases every test needs: a
      * field we allow, a multiline one, and two we must refuse.
      *

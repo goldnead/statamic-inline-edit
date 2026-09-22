@@ -42,11 +42,21 @@ class InjectEditor
 
         $editor = app(Editor::class);
 
+        if (! $editor->enabled()) {
+            return $response;
+        }
+
         // No marker was rendered, so there is nothing to edit and nothing that
         // distinguishes this response from the one a visitor gets. Leaving the
         // cache header off here is deliberate: marking every page of a signed-in
         // editor uncacheable would empty the cache of a busy site by browsing it.
-        if (! $editor->enabled() || ! $editor->hasRendered()) {
+        //
+        // Unless the site draws itself. There a new page is not a new request,
+        // so the script has to be on the page before the markers are, and the
+        // cost of that is exactly the one described above — which on such a
+        // site is no cost, because Statamic is not serving those pages and not
+        // caching them either. Off by default, and named in the config.
+        if (! $editor->hasRendered() && ! $this->forSignedIn($editor)) {
             return $response;
         }
 
@@ -61,6 +71,20 @@ class InjectEditor
         }
 
         return $this->inject($response);
+    }
+
+    /**
+     * Whether this response gets the editor on the strength of the session
+     * alone, without a marker having been rendered into it.
+     *
+     * Deliberately not "is an admin": who may change a given entry is decided
+     * per entry, later and elsewhere, and a page that carries the script but
+     * no markers shows nothing at all.
+     */
+    protected function forSignedIn(Editor $editor): bool
+    {
+        return (bool) config('statamic-inline-edit.inject_for_signed_in', false)
+            && $editor->user() !== null;
     }
 
     protected function inject(Response $response): Response

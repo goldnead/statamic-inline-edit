@@ -267,6 +267,7 @@ php artisan vendor:publish --tag=statamic-inline-edit-config
 | `inline` | `bard` | The real control panel field, opened over the block instead of on a card. |
 | `control_panel` | `true` | Everything else opens the control panel in an overlay. Off means those fields are simply not clickable. |
 | `middleware_groups` | `statamic.web` | Which route groups the editor rides on. A site that serves its own pages adds `web`. |
+| `inject_for_signed_in` | `false` | Place the editor on every page a signed-in user opens, not only on pages with a marker. For a site whose pages are drawn client-side. |
 | `multiline` | `textarea` | Of the text ones, where Enter inserts a line break instead of leaving the field. |
 | `inject` | `true` | Places the editor before `</body>` automatically. Switch off and use `{{ inline_edit:assets }}` if a Content Security Policy needs the script somewhere specific. |
 | `max_length` | `100000` | A ceiling on any one field, independent of the blueprint. |
@@ -306,7 +307,9 @@ refusals, the same fieldtype handling. An empty array is the normal answer, beca
 every visitor gets, and an element that spreads an empty array is byte for byte the element it
 was.
 
-One thing such a site has to do that an Antlers site does not: name its own route group.
+Two things such a site has to do that an Antlers site does not.
+
+**Name its own route group.**
 
 ```php
 'middleware_groups' => ['statamic.web', 'web'],
@@ -316,6 +319,39 @@ Pages your controllers serve are in `web` and never in `statamic.web`, so withou
 injects the editor there and nothing marks those responses uncacheable. Naming both is safe —
 Statamic's own frontend controller adds `statamic.web` on top of `web`, so its pages pass
 through twice, and the second pass leaves the script it finds alone.
+
+**Put the editor on every page.**
+
+```php
+'inject_for_signed_in' => true,
+```
+
+Because a new page is not a new request. Going from a list to an article is a fetch that
+returns JSON, nothing is injected into it, and the markers that arrive with it would have no
+script to act on them — the page looks editable and double-clicking does nothing, silently.
+With this on, the script is already there when they appear, and shows nothing on a page that
+has none. The price: the script carries a CSRF token, so every page a signed-in user opens is
+marked uncacheable. On a site whose pages Statamic does not serve, that costs nothing.
+
+The editor watches the document and takes in markers as they arrive, so a client-side
+navigation needs nothing from you. Two things your router can ask anyway:
+
+```js
+window.StatamicInlineEdit.rescan()   // I just changed the page
+window.StatamicInlineEdit.dirty()    // how many fields have unsaved text in them
+```
+
+`dirty()` matters. On such a site, leaving a page is a navigation and not an unload, so the
+browser's own "you have unsaved changes" never fires and three rewritten paragraphs go with it
+without a word. In Inertia:
+
+```js
+router.on('before', (event) => {
+    if (window.StatamicInlineEdit?.dirty() && ! confirm('Unsaved changes. Leave anyway?')) {
+        event.preventDefault();
+    }
+});
+```
 
 `InlineEdit::active()` answers whether this request has a marker on it at all, and
 `InlineEdit::assets()` gives the markup for a layout that places the script itself.

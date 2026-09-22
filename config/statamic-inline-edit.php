@@ -212,6 +212,33 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Place the editor on every page a signed-in editor opens
+    |--------------------------------------------------------------------------
+    |
+    | Off, the editor is placed on pages that rendered a marker, which is the
+    | right answer whenever a new page means a new request.
+    |
+    | It is the wrong answer for a site that draws itself. Going from a list to
+    | an article inside a React or Vue application never reaches the server:
+    | the response is JSON, nothing is injected into it, and the markers that
+    | arrive with it have no script to act on them. The page looks editable and
+    | double-clicking does nothing, silently — which is the worst way for this
+    | to fail, because there is nothing to see and nothing to look up.
+    |
+    | On, the script is already there when those markers appear, and it takes
+    | them in. It shows nothing on a page that has none.
+    |
+    | The price is stated rather than hidden: the script carries a CSRF token,
+    | so every page a signed-in editor opens is marked uncacheable. On a site
+    | whose pages Statamic does not serve that costs nothing, because Statamic
+    | is not caching them either. Leave this off anywhere else.
+    |
+    */
+
+    'inject_for_signed_in' => false,
+
+    /*
+    |--------------------------------------------------------------------------
     | Fall back to the control panel
     |--------------------------------------------------------------------------
     |

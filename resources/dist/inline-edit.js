@@ -27,45 +27,32 @@
     }
 
     /**
-     * Wait for the markers if they are not in the HTML yet.
+     * The markers do not have to be in the HTML, and they do not have to stay.
      *
-     * On an Antlers site they always are: the page arrives rendered and this
-     * script runs after it. A site drawn by React or Vue sends an empty root
-     * and a blob of props, and the markers appear when the application mounts
-     * — which is after a deferred script has run. Reading the document once
-     * and giving up found nothing there, and the editor simply never appeared
-     * on exactly the pages it had been installed for.
+     * On an Antlers site they are there when this runs and they never change:
+     * the page arrives rendered and the next page is another request. A site
+     * drawn by React or Vue is neither. It sends an empty root and a blob of
+     * props, so the markers appear when the application mounts, after a
+     * deferred script has run; and going from one page to another inside it
+     * replaces them without any request the browser calls a navigation.
      *
-     * ponytail: this waits for the first markers, not for every later set. A
-     * client-side navigation to another page inside the same application
-     * replaces them, and this does not notice. Reload, or call the boot again
-     * from your router if that stops being good enough.
+     * So nothing is read once. Everything the editor knows about markers goes
+     * through `rescan()`, which runs at boot and again whenever the document
+     * changes. `window.StatamicInlineEdit.rescan()` is there for a router
+     * that would rather say so itself.
      */
-    if (document.querySelector('[data-sie-field]')) {
-        start();
-    } else {
-        var waiting = new MutationObserver(function () {
-            if (!document.querySelector('[data-sie-field]')) return;
-
-            stopWaiting();
-            start();
-        });
-
-        var giveUp = setTimeout(stopWaiting, 15000);
-
-        waiting.observe(document.documentElement, { childList: true, subtree: true });
-    }
-
-    function stopWaiting() {
-        clearTimeout(giveUp);
-        waiting.disconnect();
-    }
+    start();
 
     function start() {
 
     var L = config.labels || {};
-    var nodes = Array.prototype.slice.call(document.querySelectorAll('[data-sie-field]'));
-    if (!nodes.length) return;
+
+    // Filled by rescan() at the bottom of this function, and again whenever
+    // the document changes. Not read once here: on a site with client-side
+    // navigation the markers in the document at this moment are not the only
+    // markers there will ever be.
+    var nodes = [];
+    var attached = new Set();
 
     // Chromium and WebKit strip formatting for us. Firefox only got this in
     // 136, so the paste handler below stays regardless.
@@ -225,8 +212,13 @@
         // While a field is open in place, the page's bar has nothing to say.
         // The one thing there is to save is in the frame, and it has its own
         // Save; a second one in the bar, greyed out, only asks which is which.
-        bar.hidden = !editing || !!inplaceFor;
-        launcher.hidden = editing;
+        //
+        // And nothing at all on a page with no markers on it. The script is
+        // loaded on every page of a site that places it itself, so that a
+        // marker arriving later is not missed — an invitation to edit a page
+        // that has nothing editable on it would be the price of that.
+        bar.hidden = !editing || !!inplaceFor || !nodes.length;
+        launcher.hidden = editing || !nodes.length;
 
         countEl.textContent = editing
             ? (count ? counted(count) : (L.hint || ''))
@@ -263,6 +255,33 @@
 
     /* ------------------------------------------------------------- editing */
 
+    /**
+     * What a marker looks like while edit mode is on.
+     *
+     * Its own function rather than a branch inside the toggle, because a
+     * marker can now arrive after the toggle has already happened — from a
+     * client-side navigation — and it has to look the same as the ones that
+     * were here when it was pressed.
+     */
+    function dress(node) {
+        node.setAttribute('tabindex', '0');
+
+        // No badge on a narrow field. It sits to the right, and in a row of
+        // four facts the right of one field is the value of the next: the
+        // label of "Belegung" landed on "Beginn". The dashed outline still
+        // says editable, and the control that opens names its own kind in its
+        // header.
+        if (node.getBoundingClientRect().width >= 140) {
+            node.dataset.sieBadge = BADGES[node.dataset.sieMode || 'text'] || '';
+        } else {
+            delete node.dataset.sieBadge;
+        }
+
+        node.classList.toggle('sie-empty', read(node) === '');
+
+        if (read(node) === '') node.setAttribute('data-sie-placeholder', placeholder(node));
+    }
+
     function setEditing(on) {
         editing = on;
 
@@ -279,21 +298,7 @@
 
         nodes.forEach(function (node) {
             if (on) {
-                node.setAttribute('tabindex', '0');
-                // No badge on a narrow field. It sits to the right, and in a
-                // row of four facts the right of one field is the value of
-                // the next: the label of "Belegung" landed on "Beginn". The
-                // dashed outline still says editable, and the control that
-                // opens names its own kind in its header.
-                var wide = node.getBoundingClientRect().width >= 140;
-
-                if (wide) {
-                    node.dataset.sieBadge = BADGES[node.dataset.sieMode || 'text'] || '';
-                } else {
-                    delete node.dataset.sieBadge;
-                }
-                node.classList.toggle('sie-empty', read(node) === '');
-                if (read(node) === '') node.setAttribute('data-sie-placeholder', placeholder(node));
+                dress(node);
             } else {
                 stopEditing(node);
                 node.removeAttribute('tabindex');
@@ -1670,7 +1675,23 @@
         paint();
     }
 
-    nodes.forEach(function (node) {
+    /**
+     * Everything one marker needs, so that a marker arriving later gets it too.
+     *
+     * Pulled out of a `forEach` over the markers that happened to be in the
+     * document at boot, because on a site with client-side navigation that
+     * set is not the only set. Going from an index page to an article inside
+     * a React or Vue application replaces the content without a request the
+     * browser calls a navigation, and the markers that come with it were born
+     * after this script ran. They looked exactly like the ones it knew and did
+     * nothing at all, silently, which is the worst way for this to fail.
+     */
+    function attach(node) {
+        if (attached.has(node)) return;
+
+        attached.add(node);
+        nodes.push(node);
+
         original.set(node, read(node));
 
         // Marked at boot, not when edit mode comes on. An empty field has no
@@ -1754,7 +1775,55 @@
         });
 
         node.addEventListener('input', paint);
-    });
+
+        // The badge and the outline are painted by the same code that paints
+        // them on the toggle, so a marker that arrives while edit mode is on
+        // is immediately as clickable as the ones that were here first.
+        if (editing) dress(node);
+    }
+
+    /**
+     * Take in whatever markers the document has now.
+     *
+     * Called once at boot and then on every change to the document, because a
+     * client-side navigation is the normal way around a site like that and it
+     * never goes past the server.
+     */
+    function rescan() {
+        var found = document.querySelectorAll('[data-sie-field]');
+        var before = nodes.length;
+
+        // Gone with the page they were on. Keeping them would leave the bar
+        // counting unsaved changes in a document nobody can see any more.
+        nodes = nodes.filter(function (node) {
+            if (node.isConnected) return true;
+
+            attached.delete(node);
+            original.delete(node);
+            pending.delete(node);
+
+            return false;
+        });
+
+        Array.prototype.forEach.call(found, attach);
+
+        if (nodes.length !== before) paint();
+    }
+
+    /**
+     * The two things a host application's router has to be able to ask.
+     *
+     * `rescan` for a router that would rather say "I just changed the page"
+     * than let the observer notice, and `dirty` because leaving a page with
+     * unsaved text in it is a navigation on such a site — not an unload, so
+     * the `beforeunload` guard below never fires and the text is simply gone.
+     */
+    window.StatamicInlineEdit = {
+        rescan: rescan,
+        dirty: function () {
+            return dirty().length;
+        },
+    };
 
     /* ---------------------------------------------------------------- save */
 
@@ -1981,7 +2050,36 @@
         // See setEditing.
     }
 
+    // The markers this page has right now, before the mode is restored, so
+    // that a page reopened in edit mode is outlined from the first paint.
+    rescan();
+
     setEditing(wasEditing);
+
+    /**
+     * And the markers it gets later.
+     *
+     * Batched to the end of the task, because a framework rendering a page
+     * touches the document a few hundred times and `rescan()` would run for
+     * each of them. One pass afterwards sees the same result.
+     *
+     * It never disconnects. A router can navigate any number of times, and
+     * the observer is a few microseconds per batch — the version that gave up
+     * after the first set of markers is precisely the version where the
+     * second page was silently not editable.
+     */
+    var queued = false;
+
+    new MutationObserver(function () {
+        if (queued) return;
+
+        queued = true;
+
+        Promise.resolve().then(function () {
+            queued = false;
+            rescan();
+        });
+    }).observe(document.documentElement, { childList: true, subtree: true });
 
     }
 })();

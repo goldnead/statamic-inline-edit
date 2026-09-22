@@ -1,5 +1,48 @@
 # Changelog
 
+## 1.6.0
+
+### A site that draws itself keeps its markers
+
+1.5.0 gave those sites a marker. This gives them the second half, which the
+first release got wrong in a way only a real site could show.
+
+On a site whose pages are drawn client-side, a new page is not a new request.
+Going from a list to an article is a fetch that returns JSON, so nothing is
+injected into it, and the markers that arrive with it were born after the
+script ran. The editor read the document once, found them the first time by
+waiting, and was silently dead from the second page on. Double-click, nothing,
+no error.
+
+So nothing is read once any more. Every marker goes through `rescan()`, which
+runs at boot and again whenever the document changes — batched to the end of
+the task, because a framework rendering a page touches the document a few
+hundred times. Markers that leave with their page are let go, so the bar stops
+counting unsaved changes in a document nobody can see.
+
+And the script has to be on the page *before* those markers appear, which on
+such a site means before there is anything to edit. New config:
+
+```php
+'inject_for_signed_in' => true,
+```
+
+Off by default. On, the editor is placed on every page a signed-in user opens,
+and shows nothing on a page with no markers on it. The price is stated rather
+than hidden: the script carries a CSRF token, so those pages are marked
+uncacheable. On a site whose pages Statamic does not serve, that costs nothing.
+
+Two things a router can ask, for the cases the observer cannot see:
+
+```js
+window.StatamicInlineEdit.rescan()   // I just changed the page
+window.StatamicInlineEdit.dirty()    // how many fields have unsaved text in them
+```
+
+`dirty()` exists because leaving a page is a navigation on such a site, not an
+unload — `beforeunload` never fires, and three rewritten paragraphs go with it
+without a word. Ask it in your router's before-hook.
+
 ## 1.5.1
 
 Three findings from the Gauntlet rounds that 1.5.0 shipped without. Each one is

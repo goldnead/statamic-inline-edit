@@ -1081,6 +1081,64 @@ check(
     'was ' + afterBefore + ', is ' + afterAfter
 );
 
+/* ------------------------------------------------ markers that arrive later */
+
+console.log('\na page that draws itself');
+
+// What a client-side navigation looks like from here: the markers the editor
+// knew are gone, and different ones are in the document instead. No request,
+// no load event, nothing the script would otherwise hear about. The version
+// that read the document once was silently dead from this point on.
+await page.evaluate(() => {
+    const column = document.querySelector('.column');
+
+    column.querySelectorAll('[data-sie-field]').forEach((el) => el.remove());
+
+    const fresh = document.createElement('div');
+    fresh.className = 'prose';
+    fresh.textContent = 'Ein Artikel, den der Router nachgeliefert hat.';
+
+    for (const [key, value] of Object.entries({
+        'data-sie-id': 'entry-2',
+        'data-sie-field': 'excerpt',
+        'data-sie-type': 'textarea',
+        'data-sie-mode': 'text',
+        'data-sie-stamp': '1700000000',
+        'data-sie-label': 'Vorspann',
+    })) fresh.setAttribute(key, value);
+
+    column.appendChild(fresh);
+});
+
+await page.waitForTimeout(300);
+
+const late = page.locator('[data-sie-field="excerpt"]');
+
+check('the editor takes in a marker that arrived after it did', (await late.count()) === 1);
+check('and dresses it, because edit mode is already on', (await late.getAttribute('data-sie-badge')) !== null);
+check('and the bar is still there', ! await bar.evaluate((el) => el.hidden));
+
+await late.dblclick();
+await page.waitForTimeout(200);
+
+check('and it opens', await late.evaluate((el) => el.isContentEditable));
+
+await page.keyboard.type(' Geändert.');
+await page.waitForTimeout(200);
+
+check('and counts as a change', (await count.textContent()).includes('1'));
+
+// And the page that has nothing to edit on it: the script is loaded there too
+// on a site that places it itself, and an invitation to edit a page with
+// nothing editable on it would be the price.
+await page.evaluate(() => {
+    document.querySelectorAll('[data-sie-field]').forEach((el) => el.remove());
+});
+
+await page.waitForTimeout(300);
+
+check('and on a page with nothing to edit, the bar goes away', await bar.evaluate((el) => el.hidden));
+
 await browser.close();
 server.close();
 
