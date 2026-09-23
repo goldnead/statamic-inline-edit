@@ -119,6 +119,42 @@ class InPlaceTest extends TestCase
             ->assertInertia(fn (AssertableInertia $page) => $page->where('inplace', false));
     }
 
+    #[Test]
+    public function in_place_the_toolbar_comes_with_the_selection(): void
+    {
+        $this->makeCollection();
+        $this->makeEntry(['title' => 'Hello']);
+
+        $this->actingAs($this->anEditor());
+
+        // A bar that stands there whether or not anybody is about to use it is
+        // the one thing an editor inside a page must not look like. Bard has
+        // the other mode already, and the blueprint is answering a different
+        // question: how the field should look in the control panel.
+        $this->get('/cp/inline-edit/field/pages/entry-1/inhalt?inplace=1')
+            ->assertOk()
+            ->assertInertia(fn (AssertableInertia $page) => $page
+                ->where('blueprint.tabs.0.sections.0.fields.0.toolbar_mode', 'floating')
+            );
+    }
+
+    #[Test]
+    public function on_the_card_it_stays_docked(): void
+    {
+        $this->makeCollection();
+        $this->makeEntry(['title' => 'Hello']);
+
+        $this->actingAs($this->anEditor());
+
+        // The card is a control panel on top of a page, not a page. There a
+        // docked toolbar is right, and the blueprint's own answer stands.
+        $this->get('/cp/inline-edit/field/pages/entry-1/inhalt')
+            ->assertOk()
+            ->assertInertia(fn (AssertableInertia $page) => $page
+                ->where('blueprint.tabs.0.sections.0.fields.0.toolbar_mode', 'fixed')
+            );
+    }
+
     /* ------------------------------------------------ a front end that is not Antlers */
 
     #[Test]

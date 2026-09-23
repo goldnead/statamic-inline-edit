@@ -171,10 +171,14 @@ and where they cannot be read (a stylesheet from another origin, which is how mo
 Google Fonts) the frame asks that stylesheet for itself.
 
 Everything a control panel draws to tell one field from the next comes off — the box, the
-label, the instructions, the editor's padding and background. The toolbar and the buttons sit
-in a strip under the text, and the page makes room for exactly that strip, so nothing is
-covered and nothing but what follows moves. The page's own bar steps aside while the field is
-open.
+label, the instructions, the editor's padding and background, the focus ring.
+
+**The toolbar comes with the selection.** In place the field is opened in Bard's floating
+mode, whatever the blueprint says: select a few words and the buttons appear over them, let go
+and they are gone. The blueprint's own setting is left alone, because it answers a different
+question — how the field should look in the control panel, where a docked toolbar is right.
+Save and Close keep a strip under the text; they have to be reachable the whole time, and the
+page makes room for exactly that strip. The page's own bar steps aside while the field is open.
 
 Two things to know. The frame covers that strip's worth of space, and a click there does not
 reach the page: an iframe cannot let a click through part of itself. And the block keeps the

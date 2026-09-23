@@ -40,7 +40,9 @@ class FieldController extends CpController
     {
         $this->authorize('view', $entry);
 
-        [$fields, $field, $blueprint] = $this->fieldsFor($entry, $handle);
+        $inplace = $request->boolean('inplace');
+
+        [$fields, $field, $blueprint] = $this->fieldsFor($entry, $handle, inplace: $inplace);
 
         return Inertia::render('statamic-inline-edit::Field', [
             'handle' => $handle,
@@ -62,7 +64,7 @@ class FieldController extends CpController
             // on a card over it. It changes nothing about what is saved and
             // nothing about who may save it — only the chrome around the
             // field, which is why it may come from the query string.
-            'inplace' => $request->boolean('inplace'),
+            'inplace' => $inplace,
             'labels' => [
                 'save' => __('statamic-inline-edit::messages.save'),
                 'saving' => __('statamic-inline-edit::messages.saving'),
@@ -114,7 +116,7 @@ class FieldController extends CpController
      *
      * @return array{0: Fields, 1: Field, 2: \Statamic\Fields\Blueprint}
      */
-    protected function fieldsFor($entry, string $handle, bool $preProcess = true): array
+    protected function fieldsFor($entry, string $handle, bool $preProcess = true, bool $inplace = false): array
     {
         $editor = app(Editor::class);
 
@@ -143,7 +145,7 @@ class FieldController extends CpController
 
         $field = $blueprint->field($handle);
 
-        $blueprint = $this->blueprintFor($entry, $handle, $field);
+        $blueprint = $this->blueprintFor($entry, $handle, $field, $inplace);
 
         $fields = $blueprint->fields();
 
@@ -154,12 +156,25 @@ class FieldController extends CpController
         return [$fields->addValues([$handle => $entry->value($handle)])->preProcess(), $field, $blueprint];
     }
 
-    protected function blueprintFor($entry, string $handle, Field $field): \Statamic\Fields\Blueprint
+    protected function blueprintFor($entry, string $handle, Field $field, bool $inplace = false): \Statamic\Fields\Blueprint
     {
         $config = collect($field->config())->except([
             'if', 'if_any', 'show_when', 'show_when_any',
             'unless', 'unless_any', 'hide_when', 'hide_when_any',
         ])->all();
+
+        // Standing in the article's column, a docked toolbar is the wrong
+        // shape. It sits there whether or not anybody is about to use it, and
+        // a bar across the page is the one thing an editor in a page must not
+        // look like. Bard has the other mode already: `floating` puts the
+        // buttons over the selection and takes them away again with it.
+        //
+        // Forced rather than asked of the blueprint, because the blueprint is
+        // answering a different question: how the field should look in the
+        // control panel, where a docked toolbar is right.
+        if ($inplace && ($config['type'] ?? null) === 'bard') {
+            $config['toolbar_mode'] = 'floating';
+        }
 
         return Blueprint::makeFromFields([$handle => $config])->setParent($entry);
     }

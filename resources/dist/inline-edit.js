@@ -953,7 +953,14 @@
         // took effect describes a page that no longer exists.
         var height = inplaceGeom.height;
 
-        inplaceSpacer.style.height = Math.max(0, height - inplaceFor.offsetHeight - inplaceSpacerCost) + 'px';
+        // Nur was unter dem Block hängt. Der Teil über ihm hängt über die
+        // Seite und braucht keinen Platz: ihn hier mitzuzählen hieße, ihn
+        // zweimal zu rechnen, und die Lücke unter dem Text war dann genau um
+        // die Höhe der Werkzeugleiste zu groß.
+        inplaceSpacer.style.height = Math.max(
+            0,
+            height - inplaceGeom.lift - inplaceFor.offsetHeight - inplaceSpacerCost
+        ) + 'px';
 
         var box = inplaceFor.getBoundingClientRect();
 
@@ -1280,9 +1287,16 @@
         // The box. A control panel draws one so that a Bard can be told apart
         // from the Grid under it; in an article there is nothing to tell it
         // apart from, and the border is simply a rectangle around a paragraph.
+        // `outline` und `box-shadow` mit: der Fokusring des Control Panels ist
+        // keins von beidem allein, und ein blauer Kasten um den Absatz ist
+        // genau die Kante, die hier nicht sein darf. Er sagt „Eingabefeld",
+        // und das Versprechen ist „Seite".
         '.sie-cp-inplace :is(.bard-fieldtype,.bard-editor){' +
             'background:transparent !important;border:0 !important;border-radius:0 !important;' +
-            'box-shadow:none !important}',
+            'box-shadow:none !important;outline:none !important}',
+
+        '.sie-cp-inplace :is(.bard-fieldtype,.bard-editor):is(:focus,:focus-within,:focus-visible){' +
+            'box-shadow:none !important;outline:none !important}',
 
         // And whatever holds the editor, for a fieldtype whose classes are
         // not these. Structure is the one thing core cannot change here: the
@@ -1305,41 +1319,37 @@
         '.sie-cp-inplace .ProseMirror :where(p,h1,h2,h3,h4,h5,h6,li,blockquote)' +
             '{white-space:normal !important}',
 
-        // The controls go under the text, in a strip of their own.
+        // Room above the text and room below it, and nothing in the flow.
         //
-        // They were floating over the page for one round, and that was worse
-        // than the problem it solved: the toolbar sat on top of another field
-        // and the buttons cut a line of the article in half. "Everything but
-        // the controls looks the same" cannot mean the controls delete what
-        // they cover.
+        // Above is where the toolbar lives, and it only exists while something
+        // is selected: the field is opened in Bard's floating mode, so the
+        // buttons come with the selection and go with it. A bar that stands
+        // there whether or not anybody is about to use it is the one thing an
+        // editor inside a page must not look like.
         //
-        // So: the text keeps its place to the pixel, and the page below makes
-        // room for one strip — a toolbar on the left, Save and Close on the
-        // right. That is what every editor on a page does, and the only thing
-        // that moves is what was below the part being written.
+        // The room has to be reserved all the same, because that toolbar is
+        // drawn inside this frame and the frame ends where the text does. A
+        // selection on the first line would put it half outside and it would
+        // be cut off. So the form gets a top padding, the page reads it as
+        // `lift` and pulls the frame up by exactly that much, and the strip
+        // hangs over what is above the article — empty until it is needed.
         //
-        // `order` rather than moving anything: the toolbar is core's markup,
-        // inside core's wrapper, and a flex column can put it after its
-        // sibling without either of them being touched.
-        '.sie-cp-inplace{position:relative !important}',
+        // Below is the same trick for Save and Close, except the page makes
+        // real room for that one, because something has to be clickable there
+        // the whole time.
+        '.sie-cp-inplace{position:relative !important;padding:52px 0 56px !important}',
 
-        // The toolbar's own parent, found by the toolbar rather than by name:
-        // in Statamic 6 it is the `.bard-fieldtype` wrapper and the editor is
-        // its sibling, and naming the wrong one of the two puts the toolbar
-        // back on top of the text it was supposed to move out from under.
-        '.sie-cp-inplace :where(div):has(> .bard-fixed-toolbar){' +
-            'display:flex !important;flex-direction:column !important}',
-
-        '.sie-cp-inplace .bard-fixed-toolbar{' +
-            'order:2 !important;width:fit-content !important;max-width:100% !important;' +
-            'border:0 !important;border-radius:8px !important;margin:12px 0 0 !important;' +
-            'box-shadow:0 4px 14px rgb(0 0 0 / 10%),0 0 0 1px rgb(0 0 0 / 8%) !important}',
-
-        // Out of the flow and into the same strip, on the other side of it.
-        // Its own row would be a second strip and twice the room to make.
         '.sie-cp-inplace .sie-cp-actions{' +
             'position:absolute !important;right:0 !important;bottom:0 !important;' +
             'margin:0 !important;padding:0 !important;gap:8px !important}',
+
+        // And if a field somehow still carries the docked toolbar — a
+        // fieldtype that is not Bard, an older core — it at least stops being
+        // a rule across the page.
+        '.sie-cp-inplace .bard-fixed-toolbar{' +
+            'width:fit-content !important;max-width:100% !important;' +
+            'border:0 !important;border-radius:8px !important;margin:0 0 12px !important;' +
+            'box-shadow:0 4px 14px rgb(0 0 0 / 10%),0 0 0 1px rgb(0 0 0 / 8%) !important}',
 
         // And the primary in this addon's own blue rather than the control
         // panel's indigo — the same blue as the outline around every editable

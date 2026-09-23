@@ -1,5 +1,38 @@
 # Changelog
 
+## 1.7.0
+
+### The toolbar comes with the selection and goes with it
+
+A bar that stands there whether or not anybody is about to use it is the one
+thing an editor inside a page must not look like. It says "form", and the whole
+promise of this mode is "page".
+
+Bard already has the other mode, so in place the field is opened in it:
+`toolbar_mode: floating`. Select a few words and the buttons appear over them;
+let go and they are gone. The blueprint's own setting is left alone, because it
+is answering a different question — how the field should look in the control
+panel, where a docked toolbar is right.
+
+Room is reserved for it all the same. That toolbar is drawn inside the frame,
+and the frame ends where the text does: a selection on the first line would put
+it half outside and it would be cut off. So the form carries a top padding, the
+page reads it and pulls the frame up by exactly that much, and the strip hangs
+over what is above the article, empty until something is selected.
+
+Two things that were wrong and only a screenshot showed:
+
+- **The frame's blue focus ring.** Stripping `border` and `box-shadow` was not
+  enough; the control panel's ring is neither on its own. A blue rectangle
+  around a paragraph is exactly the edge this mode exists to remove.
+- **The room below was the toolbar's room, counted twice.** The spacer took the
+  whole difference between the frame and the block, but the part above the
+  block hangs over the page and needs none. The gap under the text was one
+  toolbar too tall.
+
+Save and Close keep their strip under the text. They have to be reachable the
+whole time, not only while something is selected.
+
 ## 1.6.0
 
 ### A site that draws itself keeps its markers
