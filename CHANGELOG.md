@@ -1,5 +1,53 @@
 # Changelog
 
+## Unreleased
+
+### The save bar vanished while a field was open in place
+
+With the bottom bar up ("Edit page"), opening a Bard in place took the bar
+away, and the frame's own Save button sits under the whole field. On a long
+Bard that meant scrolling a screen away from the words to find it.
+
+The bar now stays while a field is open in place, and its buttons work on
+that field: Save tells the frame to save (the frame runs the same action its
+own button does, with the same validation, and answers `saved` as before,
+which closes and reloads), Discard closes the field the way the frame's own
+close button does. The buttons are enabled in that state even at a change
+count of zero, because there is exactly one thing to save and it lives in the
+frame. The frame's own buttons stay. The frame only accepts such messages
+from the window that framed it, marked `statamic-inline-edit-host`, the same
+handshake the typography already uses.
+
+### Bard content in the editor did not take the page's own shapes, lists worst
+
+The typography the page hands to the in-place editor is read from probe
+elements, and the probes missed the forms in which a page really styles a
+list:
+
+- Lists indented by `margin-left` (rather than padding) sat flush left in
+  the editor; the margin was never read.
+- ProseMirror wraps every list item's text in a paragraph, and Bard's
+  augmented output puts that same `<li><p>` on the page. A page that resets
+  the paragraph margin inside list items (the common prose reset) had the
+  editor take the ordinary paragraph margin instead, spreading every item
+  apart. There is a probe for the paragraph inside an item now.
+- A list nested in a list item took the outer list's indent and marker.
+- The list marker itself is a pseudo element: a page styling `li::marker`
+  in its own colour or size was not copied. Chrome and Safari expose the
+  marker's computed style; on Firefox the marker keeps inheriting from the
+  item, which is what it does on the page when nothing is said about it.
+- A quote lost its `margin-left` indent, and a horizontal rule kept the
+  frame's own bottom border where the page draws only the top one.
+- Inline marks (links, strong, em, code) were probed as bare children of
+  the field instead of inside a paragraph where they occur, so each came
+  back one font size too small, and code was hit by the monospace default
+  size on top of it.
+
+The browser suite now compares the computed styles of `ul`, `li`, `li > p`,
+`ul ul`, `li::marker`, `blockquote`, `hr`, `a`, `strong`, `em` and `code`
+between the page and the editor over it, against a fixture page that styles
+its lists its own way. Nine of those comparisons failed before, none after.
+
 ## 1.7.1
 
 ### Inserting a Bard set in inline/cp mode failed with 403
