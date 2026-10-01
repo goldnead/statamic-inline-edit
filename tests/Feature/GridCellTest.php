@@ -222,11 +222,49 @@ class GridCellTest extends TestCase
             'zeilen.r1',                // not a cell
             'zeilen.r1.wert.extra',     // not a cell either
             'zeilen..wert',             // an empty id matches the row without one
+            'zeilen.r1.id',             // the row's own address
         ] as $key) {
             $this->actingAs($editor)
                 ->postJson($this->url, $this->change([$key => 'x']))
                 ->assertStatus(422);
         }
+
+        // Only a scalar is text. An array or an object would land in the file
+        // as a structure the column was never meant to hold.
+        foreach ([['x'], ['a' => 'b'], true, null] as $value) {
+            $this->actingAs($editor)
+                ->postJson($this->url, $this->change(['zeilen.r1.wert' => $value]))
+                ->assertStatus(422);
+        }
+
+        $this->assertSame($this->rows(), Entry::find('entry-1')->get('zeilen'));
+    }
+
+    #[Test]
+    public function an_integer_cell_is_stored_as_the_column_would_store_it(): void
+    {
+        $this->anEntryWithRows();
+
+        $this->actingAs($this->anEditor())
+            ->postJson($this->url, $this->change(['zeilen.r1.anzahl' => '12']))
+            ->assertOk();
+
+        $this->assertSame(12, Entry::find('entry-1')->get('zeilen')[0]['anzahl']);
+    }
+
+    #[Test]
+    public function a_cell_under_revisions_is_refused_on_save(): void
+    {
+        config()->set('statamic.revisions.enabled', true);
+        config()->set('statamic.editions.pro', true);
+
+        $this->makeCollection();
+        Collection::find('pages')->revisionsEnabled(true)->save();
+        $this->makeEntry(['title' => 'Hello', 'zeilen' => $this->rows()]);
+
+        $this->actingAs($this->anEditor())
+            ->postJson($this->url, $this->change(['zeilen.r1.wert' => 'Neu']))
+            ->assertStatus(422);
 
         $this->assertSame($this->rows(), Entry::find('entry-1')->get('zeilen'));
     }

@@ -90,6 +90,10 @@ abstract class TestCase extends AddonTestCase
                 ['handle' => 'wert', 'field' => ['type' => 'textarea', 'display' => 'Wert']],
                 ['handle' => 'an', 'field' => ['type' => 'toggle']],
                 ['handle' => 'bild', 'field' => ['type' => 'assets', 'max_files' => 1]],
+                // Text, but named like the row's own id: writing it would move
+                // the address every other marker of this row points at.
+                ['handle' => 'id', 'field' => ['type' => 'text']],
+                ['handle' => 'anzahl', 'field' => ['type' => 'integer']],
             ]],
         ])->setHandle($handle)->setNamespace('collections.'.$handle);
 

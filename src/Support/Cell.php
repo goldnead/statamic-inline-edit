@@ -75,6 +75,12 @@ class Cell
             return null;
         }
 
+        // The row's own id is the address. A column under that handle, or one
+        // named like core's plumbing, would let an edit move or duplicate it.
+        if (in_array($column, SaveController::FORBIDDEN, true) || $column === RowId::handle()) {
+            return null;
+        }
+
         if (! is_object($entry) || ! method_exists($entry, 'blueprint')) {
             return null;
         }

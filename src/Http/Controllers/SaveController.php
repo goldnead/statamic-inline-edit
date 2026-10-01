@@ -240,7 +240,7 @@ class SaveController extends Controller
      * so a required key cannot be emptied from the page.
      *
      * @param  array<array-key, mixed>  $cells
-     * @return array<string, array<int, array<string, string>>>|JsonResponse
+     * @return array<string, array<int, array<string, mixed>>>|JsonResponse
      */
     protected function readCells(Editor $editor, EntryContract $entry, array $cells): array|JsonResponse
     {
@@ -277,18 +277,21 @@ class SaveController extends Controller
 
             $value = str_replace("\u{00A0}", ' ', $value);
 
+            $columnFields = Cell::grid($entry, $grid)->fieldtype()->fields($index)
+                ->only($column)
+                ->addValues([$column => $value]);
+
             try {
-                Cell::grid($entry, $grid)->fieldtype()->fields($index)
-                    ->only($column)
-                    ->addValues([$column => $value])
-                    ->validator()
+                $columnFields->validator()
                     ->withReplacements($this->replacements($entry))
                     ->validate();
             } catch (ValidationException $e) {
                 return $this->invalid($e);
             }
 
-            $grouped[$grid][$index][$column] = $value;
+            // Through the column's own fieldtype, so an integer column stores
+            // an integer, the same as a save in the control panel would.
+            $grouped[$grid][$index][$column] = $columnFields->process()->values()->get($column);
         }
 
         return $grouped;
