@@ -1063,9 +1063,13 @@ check(
     })
 );
 
-// One Save on the screen, not two. The bar belongs to the other fields, and
-// while this is open there is exactly one thing that can be saved.
-check('and the page\'s own bar steps aside', await bar.evaluate((el) => el.hidden));
+// The bar stays up while the field is open, and its buttons turn into the
+// frame's: the frame's own sit under the whole Bard, and on a long field
+// that is a screen of scrolling away from the words being written. There is
+// exactly one thing to save, so its Save is live at a count of zero.
+check('and the page\'s own bar stays while the field is open', ! await bar.evaluate((el) => el.hidden));
+check('with its Save live, because the one thing to save is in the frame', await save.isEnabled());
+check('and its Discard too, which closes the field untouched', await discard.isEnabled());
 
 check('nothing was reloaded while it was open', loads === 0, 'loads: ' + loads);
 
@@ -1091,6 +1095,53 @@ check(
     Math.abs(afterAfter - afterBefore) <= 1,
     'was ' + afterBefore + ', is ' + afterAfter
 );
+
+console.log('\nsaving from the bar');
+
+// The frame's own Save sits under the whole field. On a long Bard that is a
+// screen of scrolling away from the words being written; the page's bar is
+// already on screen, so its Save has to reach the open field in the frame.
+await field.dblclick();
+await page.waitForTimeout(600);
+
+const barSaveLive = await save.isEnabled();
+
+// Armed before the click, because the page reloads the moment the frame
+// answers its save, and any look at the frame after that sees a fresh one.
+let sawFrameSave = false;
+
+if (barSaveLive) {
+    const seen = page.waitForFunction(() => {
+        const frame = document.querySelector('.sie-inplace-frame');
+
+        return !!(frame && frame.contentWindow && frame.contentWindow.sieStubSaves === 1);
+    }, null, { timeout: 2000 });
+
+    await save.click();
+
+    sawFrameSave = await seen.then(() => true).catch(() => false);
+    await page.waitForTimeout(800);
+}
+
+check('the bar\'s Save saves the open field in the frame', sawFrameSave);
+
+check(
+    'and the frame\'s answer closes the field and reloads, as every save here does',
+    loads === 2 && ! await page.locator('.sie-inplace-frame').count() && await field.evaluate((el) => getComputedStyle(el).visibility !== 'hidden'),
+    'loads: ' + loads
+);
+
+// When the bar's Save never reached the frame, the field is still open and
+// its frame covers everything below it. Close it, so whatever follows runs
+// against a page in a known state whichever way this went. The click first
+// because focus lives in the frame while it is open, and the page's Escape
+// handler only hears keys that reach the page.
+if (await page.locator('.sie-inplace-frame').count()) {
+    await page.locator('body').click({ position: { x: 5, y: 5 } });
+    await page.keyboard.press('Escape');
+    await page.waitForLoadState('load');
+    await page.waitForTimeout(200);
+}
 
 /* ------------------------------------------------ markers that arrive later */
 

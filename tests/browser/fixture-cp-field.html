@@ -61,7 +61,7 @@
 
     <div class="sie-cp-actions">
         <button type="button">Schließen</button>
-        <button type="button">Speichern</button>
+        <button type="button" onclick="sieStubSave()">Speichern</button>
     </div>
 </div>
 
@@ -75,6 +75,25 @@
         parent.postMessage(message, '*');
     }
 
+    /**
+     * The one action the real form has: save, then say so.
+     *
+     * Reachable two ways, because that is the point of the page's bar: from
+     * this document's own button, and from a message the page sends when its
+     * Save is pressed. The answer is delayed by a tick, like a PATCH over the
+     * network is, so a test can watch the frame act before the page reloads.
+     */
+    var saves = 0;
+
+    function save() {
+        saves++;
+        window.sieStubSaves = saves;
+
+        setTimeout(function () { tell('saved'); }, 50);
+    }
+
+    window.sieStubSave = save;
+
     window.addEventListener('message', function (event) {
         if (event.source !== window.parent) return;
         if (event.origin !== window.location.origin) return;
@@ -82,6 +101,8 @@
         var data = event.data;
 
         if (!data || data.source !== 'statamic-inline-edit-host') return;
+
+        if (data.type === 'save') save();
 
         if (data.type === 'styles') {
             var style = document.createElement('style');

@@ -209,15 +209,15 @@
     function paint() {
         var count = dirty().length;
 
-        // While a field is open in place, the page's bar has nothing to say.
-        // The one thing there is to save is in the frame, and it has its own
-        // Save; a second one in the bar, greyed out, only asks which is which.
-        //
-        // And nothing at all on a page with no markers on it. The script is
+        // Nothing at all on a page with no markers on it. The script is
         // loaded on every page of a site that places it itself, so that a
         // marker arriving later is not missed — an invitation to edit a page
         // that has nothing editable on it would be the price of that.
-        bar.hidden = !editing || !!inplaceFor || !nodes.length;
+        //
+        // A field open in place does not hide the bar, because its buttons
+        // work even there: the frame's own sit under the whole field, and on
+        // a long Bard that is a screen of scrolling away from the words.
+        bar.hidden = !editing || !nodes.length;
         launcher.hidden = editing || !nodes.length;
 
         countEl.textContent = editing
@@ -229,8 +229,13 @@
         countEl.classList.toggle('sie-hint', editing && count === 0);
 
         bar.classList.toggle('sie-has-changes', count > 0);
-        saveBtn.disabled = busy || count === 0;
-        discardBtn.disabled = busy || count === 0;
+
+        // While a field is open in place there is exactly one thing to save,
+        // and it is not counted here because it lives in the frame. The
+        // buttons stay live for it, which is why the count is not the whole
+        // condition.
+        saveBtn.disabled = busy || (!inplaceFor && count === 0);
+        discardBtn.disabled = busy || (!inplaceFor && count === 0);
 
         // On a narrow bar the count moves onto the button rather than sitting
         // beside it as a bare digit. "Speichern 2" is short and says what the
@@ -905,9 +910,9 @@
 
         window.addEventListener('resize', positionInplace);
 
-        // The page's own bar is about the other fields, and while this is open
-        // there is exactly one thing to save. Two buttons saying "Speichern",
-        // one of them greyed out, is a question nobody should have to answer.
+        // The page's own bar stays up, and from here on its buttons are about
+        // this field: the frame's own Save sits under the whole text, and on a
+        // long Bard that is a screen of scrolling away from the words.
         paint();
     }
 
@@ -996,6 +1001,24 @@
         window.location.reload();
     }
 
+    /**
+     * Talk to the frame standing in for content, and to no other window.
+     *
+     * `/` rather than the origin spelled out: it means "only if the frame is
+     * still same-origin with this page", which is the check that matters, and
+     * it is the one form that is also valid on a page with an opaque origin.
+     */
+    function tellInplace(type, payload) {
+        var win = inplaceFrame.contentWindow;
+        if (!win) return;
+
+        var message = { source: 'statamic-inline-edit-host', type: type };
+
+        for (var key in (payload || {})) message[key] = payload[key];
+
+        win.postMessage(message, '/');
+    }
+
     window.addEventListener('message', function (event) {
         if (!inplaceFrame.contentWindow || event.source !== inplaceFrame.contentWindow) return;
 
@@ -1005,14 +1028,7 @@
 
         if (data.type === 'ready') {
             // Appearance only, and only to the frame we just opened.
-            // `/` rather than the origin spelled out: it means "only if the
-            // frame is still same-origin with this page", which is the check
-            // that matters, and it is the one form that is also valid on a
-            // page with an opaque origin.
-            inplaceFrame.contentWindow.postMessage(
-                { source: 'statamic-inline-edit-host', type: 'styles', css: inplaceCss },
-                '/'
-            );
+            tellInplace('styles', { css: inplaceCss });
 
             return;
         }
@@ -1857,8 +1873,22 @@
     /* ---------------------------------------------------------------- save */
 
     function save() {
+        if (busy) return;
+
+        // While a field stands open in place, the one thing to save is in the
+        // frame, and the frame's save is the real one: its validation, its
+        // errors, its revision of the value. The bar asks for it rather than
+        // posting a second save of its own, and the frame answers 'saved' the
+        // way it always has.
+        if (inplaceFor) {
+            tellInplace('save');
+
+            return;
+        }
+
         var changed = dirty();
-        if (!changed.length || busy) return;
+
+        if (!changed.length) return;
 
         var byEntry = {};
 
@@ -1945,6 +1975,15 @@
 
     function discard() {
         closePop();
+
+        // An open field is discarded by closing it, exactly what the frame's
+        // own close button does: the frame keeps nothing, and the reload puts
+        // the page's own rendering back.
+        if (inplaceFor) {
+            closeInplace();
+
+            return;
+        }
 
         dirty().forEach(function (node) {
             if (pending.has(node)) {

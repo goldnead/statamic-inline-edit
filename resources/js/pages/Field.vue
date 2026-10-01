@@ -196,6 +196,15 @@ function onMessage(event) {
 
     if (! data || data.source !== 'statamic-inline-edit-host') return;
 
+    // The page's bar, whose Save is on screen while this frame's sits under
+    // the whole field. Same action as the button, so the validation, the
+    // saving state and the 'saved' answer are the same too.
+    if (data.type === 'save') {
+        save();
+
+        return;
+    }
+
     if (data.type === 'styles' && typeof data.css === 'string') {
         pageStyles.value = data.css;
 
