@@ -13,6 +13,12 @@
   replaces the block correctly, none of that moves; if the typography travels,
   the stub inside is set in Georgia at the page's size and not in the control
   panel's sans-serif.
+
+  The list is styled the way a real site styles one: its own indent (padding
+  and margin), its own marker in colour and size, its own item spacing, a
+  nested list a step tighter, and no paragraph margin inside an item. Bard's
+  augmented output puts a p in every li, so the page has to say what that
+  amounts to, and the editor has to arrive at the same numbers.
 -->
 
 <link rel="stylesheet" href="../../resources/dist/inline-edit.css">
@@ -27,7 +33,14 @@
     .prose h1 { font-family: "Times New Roman", serif; font-size: 2.25rem; line-height: 1.15; margin: 0 0 1rem; }
     .prose h2 { font-family: "Times New Roman", serif; font-size: 1.75rem; line-height: 1.25; margin: 2rem 0 .75rem; }
     .prose p { font-size: 1.125rem; margin: 0 0 1.25em; }
-    .prose ul { padding-left: 1.6em; margin: 0 0 1.25em; list-style-type: square; }
+    .prose ul { padding-left: 1.6em; margin: 0 0 1.25em 1.75em; list-style-type: square; }
+    .prose ul ul { padding-left: 1.1em; margin: 0.25em 0 0; list-style-type: circle; }
+    .prose ul li { margin: 0.35em 0; }
+    .prose ul li p { margin: 0; }
+    .prose li::marker { color: #b4451f; font-size: 0.85em; }
+    .prose blockquote { margin: 0 0 1.5em 2.5em; padding-left: 1em; border-left: 3px solid #b4451f; font-style: italic; }
+    .prose hr { border: 0; border-top: 2px solid #23232b; margin: 2em 0; }
+    .prose code { background: #f2efe9; padding: 0.1em 0.3em; border-radius: 4px; }
     .prose a { color: #b4451f; text-decoration-line: underline; }
     .after { border-top: 1px solid #ddd; padding-top: 1rem; color: #666; }
 </style>
@@ -50,7 +63,10 @@
      data-sie-field-url="./fixture-cp-field.html?inplace=1"><h1>Die Überschrift im Text</h1>
 <h2>Eine Überschrift</h2>
 <p class="measured">Technik ist ein Durchgangsstadium und kein Ziel. Wer die Stimme einmal verstanden hat, hört im Chor plötzlich, woran es liegt.</p>
-<ul><li>Ein Punkt</li></ul></div>
+<ul><li><p>Ein Punkt</p><ul><li><p>Darunter</p></li></ul></li><li><p>Noch einer</p></li></ul>
+<blockquote><p>Ein Zitat, das die Seite selbst einrueckt.</p></blockquote>
+<p>Mit <a href="#">einem Link</a>, <strong>fett</strong>, <em>kursiv</em> und <code>Code</code> im Satz.</p>
+<hr></div>
 
 <p class="after">Etwas, das unter dem Feld steht und sich nicht verschieben darf.</p>
 

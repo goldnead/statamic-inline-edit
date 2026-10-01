@@ -908,6 +908,33 @@ const firstLineEnd = (locator) => locator.evaluate((el) => {
     return rects.length ? { lines: rects.length, width: Math.round(rects[0].width) } : null;
 });
 
+/**
+ * Computed style, read on the page and inside the frame, as one string.
+ *
+ * The honest comparison for "does the editor set this the way the page does"
+ * is not a screenshot but these numbers: whatever the two style sheets say,
+ * what the reader sees is the computed result. An entry may name a pseudo
+ * element, "::marker|color", because a page can style its list markers
+ * directly and no other reading reaches them.
+ */
+const computedStyle = (locator, props) => locator.evaluate((el, props) => {
+    const read = (spec) => {
+        const [pseudo, prop] = spec.includes('|') ? spec.split('|') : [null, spec];
+
+        return getComputedStyle(el, pseudo || null).getPropertyValue(prop);
+    };
+
+    return props.map(read).join(' | ');
+}, props);
+
+/** The same block twice, once on the page and once in the editor over it. */
+async function looksAlike(name, onPage, inFrame, props) {
+    const page = await computedStyle(onPage, props);
+    const frame = await computedStyle(inFrame, props);
+
+    check(name, page === frame, 'page ' + JSON.stringify(page) + ', frame ' + JSON.stringify(frame));
+}
+
 const beforeBox = await field.boundingBox();
 const beforeTop = await absTop(field);
 const readingLine = await firstLineEnd(field.locator('p.measured'));
@@ -1050,6 +1077,70 @@ check(
 check(
     'even the list marker comes along',
     (await inner.locator('.ProseMirror ul').first().evaluate((el) => getComputedStyle(el).listStyleType)) === 'square'
+);
+
+console.log('\nthe rest of the page\'s own shapes');
+
+// Lists were reported looking nothing like their page. The causes are all in
+// what the typography probes never read, and every line below is one block
+// whose computed style on the page has to be the computed style in the
+// editor: the indent, the item spacing, the paragraph ProseMirror puts in
+// every item, the nested list a step tighter, the marker's own colour and
+// size, and the same question for everything else a Bard can hold.
+await looksAlike(
+    'a list keeps the page\'s indent',
+    field.locator('ul').first(), inner.locator('.ProseMirror ul').first(),
+    ['margin-left', 'padding-inline-start', 'list-style-type']
+);
+await looksAlike(
+    'list items keep their spacing',
+    field.locator('li').first(), inner.locator('.ProseMirror li').first(),
+    ['margin-top', 'margin-bottom']
+);
+await looksAlike(
+    'and the paragraph inside an item is no gap on the page, so none here',
+    field.locator('li > p').first(), inner.locator('.ProseMirror li > p').first(),
+    ['margin-top', 'margin-bottom']
+);
+await looksAlike(
+    'a list inside a list is a step tighter, as on the page',
+    field.locator('ul ul').first(), inner.locator('.ProseMirror ul ul').first(),
+    ['margin-left', 'padding-inline-start', 'list-style-type']
+);
+await looksAlike(
+    'the marker itself, in colour and size',
+    field.locator('li').first(), inner.locator('.ProseMirror li').first(),
+    ['::marker|color', '::marker|font-size']
+);
+await looksAlike(
+    'a quote keeps its own indent, edge and voice',
+    field.locator('blockquote'), inner.locator('.ProseMirror blockquote'),
+    ['margin-left', 'padding-left', 'border-left-width', 'border-left-color', 'font-style']
+);
+await looksAlike(
+    'a rule is the page\'s line, and only that',
+    field.locator('hr'), inner.locator('.ProseMirror hr'),
+    ['margin-top', 'border-top-width', 'border-top-style', 'border-top-color', 'border-bottom-width']
+);
+await looksAlike(
+    'a link stays the page\'s colour and underline',
+    field.locator('a'), inner.locator('.ProseMirror a'),
+    ['color', 'text-decoration-line', 'font-size']
+);
+await looksAlike(
+    'emphasis stays emphasis, at the size the sentence is',
+    field.locator('strong'), inner.locator('.ProseMirror strong'),
+    ['font-weight', 'font-size']
+);
+await looksAlike(
+    'and italics stay italics',
+    field.locator('em'), inner.locator('.ProseMirror em'),
+    ['font-style', 'font-size']
+);
+await looksAlike(
+    'and code keeps its ground',
+    field.locator('code'), inner.locator('.ProseMirror code'),
+    ['font-size', 'background-color', 'border-radius', 'padding-left']
 );
 
 // The box the control panel draws around a field is the thing that made this

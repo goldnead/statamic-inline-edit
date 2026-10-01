@@ -1077,11 +1077,29 @@
         ['ul', 'ul'],
         ['ol', 'ol'],
         ['ul>li', 'li'],
+        // The paragraph ProseMirror puts inside every list item, and Bard's
+        // augmented output puts on the page. Both have it, so the page has
+        // said what it amounts to, usually nothing: without this probe the
+        // editor took the ordinary paragraph rule instead and spread every
+        // item of the list apart.
+        ['ul>li>p', 'li>p'],
+        // A list inside a list item, which most pages indent a step less and
+        // mark differently. Without this probe the nested list took the outer
+        // rule's padding and marker.
+        ['ul>li>ul', 'li>ul'],
+        ['ul>li>ol', 'li>ol'],
         ['blockquote', 'blockquote'],
-        ['a', 'a'],
-        ['strong', 'strong'],
-        ['em', 'em'],
-        ['code', 'code'],
+        // Inline elements are read where they occur, inside a paragraph, not
+        // as a bare child of the field. Two reasons, both measured: a page
+        // sizes its paragraphs (`.prose p { font-size: 1.125rem }` is the
+        // common shape), and an inline probe read outside that context came
+        // back one size smaller; and a bare `code` picks up the monospace
+        // default size instead of the sentence's size, so code in the editor
+        // shrank while the same code on the page had not.
+        ['p>a', 'a'],
+        ['p>strong', 'strong'],
+        ['p>em', 'em'],
+        ['p>code', 'code'],
         ['hr', 'hr']
     ];
 
@@ -1111,18 +1129,44 @@
 
     /** And what only some of them do. */
     var EXTRA_PROPS = {
-        ul: ['padding-inline-start', 'list-style-type', 'list-style-position'],
-        ol: ['padding-inline-start', 'list-style-type', 'list-style-position'],
-        li: ['padding-inline-start', 'margin-left'],
+        // `margin-left` belongs to the list questions as much as the padding
+        // does: a page indents its lists with either, sometimes both, and a
+        // marker rule that carries only the padding leaves a list flush left
+        // in the editor that sits indented on the page.
+        ul: ['padding-inline-start', 'list-style-type', 'list-style-position', 'margin-left'],
+        ol: ['padding-inline-start', 'list-style-type', 'list-style-position', 'margin-left'],
+        li: ['padding-inline-start', 'margin-left', 'list-style-type'],
+        'li>ul': ['padding-inline-start', 'list-style-type', 'list-style-position', 'margin-left'],
+        'li>ol': ['padding-inline-start', 'list-style-type', 'list-style-position', 'margin-left'],
+        // The quote's indent is the other half of its look, beside the bar.
         blockquote: [
             'border-left-width', 'border-left-style', 'border-left-color',
             'padding-left', 'padding-top', 'padding-right', 'padding-bottom',
-            'background-color', 'border-radius', 'quotes'
+            'background-color', 'border-radius', 'quotes', 'margin-left'
         ],
         a: ['text-decoration-line', 'text-decoration-color', 'text-decoration-thickness', 'text-underline-offset'],
         code: ['background-color', 'padding-left', 'padding-right', 'padding-top', 'padding-bottom', 'border-radius'],
-        hr: ['border-top-width', 'border-top-style', 'border-top-color']
+        // A rule is nothing but its borders. Sending only the top one left
+        // the frame's own bottom border in place, and a page that draws
+        // `border: 0; border-top: 2px` got a second, grey line in the editor.
+        hr: [
+            'border-top-width', 'border-top-style', 'border-top-color',
+            'border-bottom-width', 'border-bottom-style', 'border-bottom-color',
+            'border-left-width', 'border-left-style', 'border-left-color',
+            'border-right-width', 'border-right-style', 'border-right-color'
+        ]
     };
+
+    /**
+     * The list marker, read off the pseudo element it lives on.
+     *
+     * A page can say `li::marker { color: ...; font-size: ... }` and no
+     * reading of the li itself sees any of it. Chrome and Safari expose the
+     * marker's computed style; Firefox does not, and there the marker keeps
+     * inheriting from the li, which is what it does on the page when nothing
+     * else is said about it.
+     */
+    var MARKER_PROPS = ['color', 'font-size', 'font-family', 'font-weight'];
 
     function typography(node) {
         try {
@@ -1440,6 +1484,31 @@
                 '.sie-cp-inplace .ProseMirror' + (selector ? ' ' + selector : '') +
                 '{' + body.join(';') + '}'
             );
+
+            // The marker, for the one probe it belongs to. Best-effort like
+            // everything here: a browser that returns nothing for it simply
+            // sends no rule, and the marker inherits.
+            if (selector === 'li') {
+                try {
+                    var marker = window.getComputedStyle(target, '::marker');
+                    var markerBody = [];
+
+                    MARKER_PROPS.forEach(function (prop) {
+                        var value = marker.getPropertyValue(prop);
+
+                        if (value) markerBody.push(prop + ':' + value + ' !important');
+                    });
+
+                    if (markerBody.length) {
+                        rules.push(
+                            '.sie-cp-inplace .ProseMirror li::marker{' + markerBody.join(';') + '}'
+                        );
+                    }
+                } catch (e) {
+                    // A browser with no reading for pseudo elements. The li's
+                    // own rule is already on its way, and the marker inherits.
+                }
+            }
         });
 
         made.forEach(function (el) {

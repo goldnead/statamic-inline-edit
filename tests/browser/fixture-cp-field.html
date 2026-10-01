@@ -51,9 +51,14 @@
                     <h2>Eine Überschrift</h2>
                     <!-- Word for word what the page shows, because the check
                          outside measures where the first line breaks in both
-                         and they have to break in the same place. -->
+                         and they have to break in the same place, and compares
+                         the computed style of every other block in here with
+                         its twin out there. -->
                     <p class="measured">Technik ist ein Durchgangsstadium und kein Ziel. Wer die Stimme einmal verstanden hat, hört im Chor plötzlich, woran es liegt.</p>
-                    <ul><li>Ein Punkt</li></ul>
+                    <ul><li><p>Ein Punkt</p><ul><li><p>Darunter</p></li></ul></li><li><p>Noch einer</p></li></ul>
+                    <blockquote><p>Ein Zitat, das die Seite selbst einrueckt.</p></blockquote>
+                    <p>Mit <a href="#">einem Link</a>, <strong>fett</strong>, <em>kursiv</em> und <code>Code</code> im Satz.</p>
+                    <hr>
                 </div>
             </div>
         </div>
