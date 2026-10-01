@@ -35,7 +35,13 @@
     .prose p { font-size: 1.125rem; margin: 0 0 1.25em; }
     .prose ul { padding-left: 1.6em; margin: 0 0 1.25em 1.75em; list-style-type: square; }
     .prose ul ul { padding-left: 1.1em; margin: 0.25em 0 0; list-style-type: circle; }
-    .prose ul li { margin: 0.35em 0; }
+    /* Das verbreitete Muster: Abstand ueber grid und row-gap am ul, der
+       Marker als Pseudo-Element am li statt ueber list-style. */
+    .prose ul { display: grid; row-gap: 12px; }
+    .prose ul li { margin: 0.35em 0; position: relative; }
+    .prose ul li::before { content: ""; position: absolute; left: -1.2em; top: .8em; width: 12px; height: 2px; background-color: #b8860b; }
+    .prose blockquote { position: relative; }
+    .prose blockquote::before { content: "\201C"; position: absolute; left: 0; color: #b4451f; font-size: 2em; }
     .prose ul li p { margin: 0; }
     .prose li::marker { color: #b4451f; font-size: 0.85em; }
     .prose blockquote { margin: 0 0 1.5em 2.5em; padding-left: 1em; border-left: 3px solid #b4451f; font-style: italic; }

@@ -1112,6 +1112,29 @@ await looksAlike(
     field.locator('li').first(), inner.locator('.ProseMirror li').first(),
     ['::marker|color', '::marker|font-size']
 );
+// A page that spaces its items with grid and row-gap, and draws its markers
+// as li::before with list-style off, looked like a bare list in the editor:
+// the probes read neither display and gap nor a pseudo element's content.
+await looksAlike(
+    'a list keeps its display and the gap between its items',
+    field.locator('ul').first(), inner.locator('.ProseMirror ul').first(),
+    ['display', 'row-gap']
+);
+await looksAlike(
+    'a list item keeps its position, the anchor of its marker',
+    field.locator('li').first(), inner.locator('.ProseMirror li').first(),
+    ['position']
+);
+await looksAlike(
+    'a marker drawn as li::before comes along',
+    field.locator('li').first(), inner.locator('.ProseMirror li').first(),
+    ['::before|content', '::before|position', '::before|width', '::before|height', '::before|background-color', '::before|left', '::before|top']
+);
+await looksAlike(
+    'and so does a quote mark drawn as blockquote::before',
+    field.locator('blockquote'), inner.locator('.ProseMirror blockquote'),
+    ['position', '::before|content', '::before|position', '::before|color', '::before|font-size']
+);
 await looksAlike(
     'a quote keeps its own indent, edge and voice',
     field.locator('blockquote'), inner.locator('.ProseMirror blockquote'),

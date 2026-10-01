@@ -1127,22 +1127,58 @@
         'font-variant-ligatures', 'font-size-adjust'
     ];
 
+    /**
+     * How a list lays its items out. Only block, grid and flex mean anything
+     * for a list; any other `display` is dropped, and the properties that
+     * belong to one layout are dropped under the others.
+     */
+    var LAYOUT_PROPS = ['display', 'row-gap', 'column-gap', 'grid-template-columns', 'flex-direction'];
+
+    /**
+     * What a drawn marker or quote mark needs to look the same: the pseudo
+     * elements ::before and ::after of li and blockquote, when the page gives
+     * them content. Not p and not anything else, which keeps clear of the
+     * editor's own (the empty-paragraph placeholder, drag handles).
+     */
+    var PSEUDO_PROPS = [
+        'content', 'display', 'position', 'top', 'left', 'right', 'bottom',
+        'width', 'height', 'background-color', 'background-image',
+        'background-size', 'background-repeat', 'background-position',
+        'border-top-width', 'border-top-style', 'border-top-color',
+        'border-right-width', 'border-right-style', 'border-right-color',
+        'border-bottom-width', 'border-bottom-style', 'border-bottom-color',
+        'border-left-width', 'border-left-style', 'border-left-color',
+        'border-radius', 'color', 'font-family', 'font-size', 'font-weight',
+        'font-style', 'line-height', 'transform', 'margin-top', 'margin-right',
+        'margin-bottom', 'margin-left', 'opacity'
+    ];
+
     /** And what only some of them do. */
     var EXTRA_PROPS = {
         // `margin-left` belongs to the list questions as much as the padding
         // does: a page indents its lists with either, sometimes both, and a
         // marker rule that carries only the padding leaves a list flush left
         // in the editor that sits indented on the page.
-        ul: ['padding-inline-start', 'list-style-type', 'list-style-position', 'margin-left'],
-        ol: ['padding-inline-start', 'list-style-type', 'list-style-position', 'margin-left'],
-        li: ['padding-inline-start', 'margin-left', 'list-style-type'],
-        'li>ul': ['padding-inline-start', 'list-style-type', 'list-style-position', 'margin-left'],
-        'li>ol': ['padding-inline-start', 'list-style-type', 'list-style-position', 'margin-left'],
+        //
+        // And the layout: a very common shape spaces its items with
+        // `display: grid; row-gap` on the list and not with margins on the
+        // items. Without these a list that is 204px high on the page is 168px
+        // in the editor. See LAYOUT_PROPS for what is kept of them.
+        ul: ['padding-inline-start', 'list-style-type', 'list-style-position', 'margin-left'].concat(LAYOUT_PROPS),
+        ol: ['padding-inline-start', 'list-style-type', 'list-style-position', 'margin-left'].concat(LAYOUT_PROPS),
+        // `position` on the item, because a marker drawn as li::before hangs
+        // off `position: relative` here and would otherwise land on whatever
+        // the frame positions.
+        li: ['padding-inline-start', 'margin-left', 'list-style-type', 'position'],
+        'li>ul': ['padding-inline-start', 'list-style-type', 'list-style-position', 'margin-left'].concat(LAYOUT_PROPS),
+        'li>ol': ['padding-inline-start', 'list-style-type', 'list-style-position', 'margin-left'].concat(LAYOUT_PROPS),
         // The quote's indent is the other half of its look, beside the bar.
         blockquote: [
             'border-left-width', 'border-left-style', 'border-left-color',
             'padding-left', 'padding-top', 'padding-right', 'padding-bottom',
-            'background-color', 'border-radius', 'quotes', 'margin-left'
+            'background-color', 'border-radius', 'quotes', 'margin-left',
+            // The anchor of a ::before quote mark, as for the list item.
+            'position'
         ],
         a: ['text-decoration-line', 'text-decoration-color', 'text-decoration-thickness', 'text-underline-offset'],
         code: ['background-color', 'padding-left', 'padding-right', 'padding-top', 'padding-bottom', 'border-radius'],
@@ -1466,10 +1502,27 @@
             var props = TYPE_PROPS.concat(EXTRA_PROPS[selector] || EXTRA_PROPS[path] || []);
             var body = [];
 
+            var layout = computed.getPropertyValue('display');
+
             props.forEach(function (prop) {
                 var value = computed.getPropertyValue(prop);
 
+                // The probe takes itself out of the flow, so its own position
+                // would always read `absolute`. Ask the page's rules instead,
+                // with the probe's override lifted for the one reading.
+                if (prop === 'position' && built && built === target) {
+                    built.style.removeProperty('position');
+                    value = computed.getPropertyValue(prop);
+                    built.style.setProperty('position', 'absolute', 'important');
+                }
+
                 if (!value || value === 'none' && prop === 'quotes') return;
+
+                if (LAYOUT_PROPS.indexOf(prop) !== -1) {
+                    if (prop === 'display' && ['block', 'grid', 'flex'].indexOf(value) === -1) return;
+                    if (prop === 'grid-template-columns' && (layout !== 'grid' || value === 'none')) return;
+                    if (prop === 'flex-direction' && layout !== 'flex') return;
+                }
 
                 body.push(prop + ':' + value + ' !important');
             });
@@ -1484,6 +1537,36 @@
                 '.sie-cp-inplace .ProseMirror' + (selector ? ' ' + selector : '') +
                 '{' + body.join(';') + '}'
             );
+
+            // A marker or quote mark the page draws itself, as ::before or
+            // ::after. Only where there is content to draw: `none` and
+            // `normal` mean there is no box, and a rule for it would invent
+            // one. The content comes back quoted, as it is written in CSS.
+            if (selector === 'li' || selector === 'blockquote') {
+                ['::before', '::after'].forEach(function (pseudo) {
+                    try {
+                        var drawn = window.getComputedStyle(target, pseudo);
+                        var content = drawn.getPropertyValue('content');
+
+                        if (!content || content === 'none' || content === 'normal') return;
+
+                        var drawnBody = [];
+
+                        PSEUDO_PROPS.forEach(function (prop) {
+                            var value = drawn.getPropertyValue(prop);
+
+                            if (value) drawnBody.push(prop + ':' + value + ' !important');
+                        });
+
+                        rules.push(
+                            '.sie-cp-inplace .ProseMirror ' + selector + pseudo + '{' + drawnBody.join(';') + '}'
+                        );
+                    } catch (e) {
+                        // A browser with no reading for pseudo elements: the
+                        // block's own rule is already on its way.
+                    }
+                });
+            }
 
             // The marker, for the one probe it belongs to. Best-effort like
             // everything here: a browser that returns nothing for it simply

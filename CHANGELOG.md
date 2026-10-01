@@ -1,5 +1,18 @@
 # Changelog
 
+## Unreleased
+
+### Lists drawn with grid and `::before` looked bare in the editor
+
+A page that spaces its list items with `display: grid; row-gap` on the `ul`
+and draws its markers as `li::before` (list style off, absolutely positioned
+pseudo element) still looked different in the in-place editor: no gap, no
+marker. The probes now also read `display`, `row-gap`, `column-gap`,
+`grid-template-columns` and `flex-direction` of lists (only block, grid and
+flex), `position` of list items and quotes, and the `::before` and `::after`
+of `li` and `blockquote` whenever they have content. Nothing else gets a
+pseudo rule, so the editor's own placeholder and handles are left alone.
+
 ## 1.7.2
 
 ### The save bar vanished while a field was open in place
