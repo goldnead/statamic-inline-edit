@@ -2,6 +2,7 @@
 
 namespace Goldnead\StatamicInlineEdit\Http\Controllers;
 
+use Goldnead\StatamicInlineEdit\Support\Cell;
 use Goldnead\StatamicInlineEdit\Support\Editor;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -105,36 +106,58 @@ class SaveController extends Controller
             return $conflict;
         }
 
-        $values = $this->readFields($editor, $entry, (array) $change['fields']);
+        $cellFields = array_filter((array) $change['fields'], fn ($handle) => str_contains((string) $handle, '.'), ARRAY_FILTER_USE_KEY);
+        $plainFields = array_diff_key((array) $change['fields'], $cellFields);
+
+        $values = $plainFields === [] ? [] : $this->readFields($editor, $entry, $plainFields);
 
         if ($values instanceof JsonResponse) {
             return $values;
         }
 
-        $blueprint = $entry->blueprint();
+        $cells = $this->readCells($editor, $entry, $cellFields);
 
-        $fields = $blueprint->fields()->only(...array_keys($values))->addValues($values);
+        if ($cells instanceof JsonResponse) {
+            return $cells;
+        }
 
-        try {
-            $fields->validator()
-                ->withReplacements([
-                    'id' => $entry->id(),
-                    'collection' => $entry->collectionHandle(),
-                    'site' => $entry->locale(),
-                ])
-                ->validate();
-        } catch (ValidationException $e) {
-            return response()->json([
-                'message' => __('statamic-inline-edit::messages.error_invalid'),
-                'errors' => $e->errors(),
-            ], 422);
+        $processed = [];
+
+        if ($values !== []) {
+            $fields = $entry->blueprint()->fields()->only(...array_keys($values))->addValues($values);
+
+            try {
+                $fields->validator()
+                    ->withReplacements($this->replacements($entry))
+                    ->validate();
+            } catch (ValidationException $e) {
+                return $this->invalid($e);
+            }
+
+            $processed = $fields->process()->values()->all();
         }
 
         // On a localized entry this writes into that localization, which means
         // the field stops inheriting from its origin — exactly what the control
         // panel does once you localize a field there. Editing the German page
         // changes the German text and leaves the English alone.
-        $entry->merge($fields->process()->values());
+        $entry->merge($processed);
+
+        // Cells go into the stored rows as they are, one value at a time.
+        // Not through the grid's own process(): that rebuilds every row,
+        // strips nulls and re-processes every other cell, and a one-word
+        // correction would rewrite the whole grid in the file.
+        foreach ($cells as $grid => $rows) {
+            $stored = $entry->get($grid);
+
+            foreach ($rows as $index => $columns) {
+                foreach ($columns as $column => $value) {
+                    $stored[$index][$column] = $value;
+                }
+            }
+
+            $entry->set($grid, $stored);
+        }
 
         $entry->save();
 
@@ -206,6 +229,89 @@ class SaveController extends Controller
         }
 
         return $values;
+    }
+
+    /**
+     * The cells in this change, checked and grouped as grid → row → column.
+     *
+     * Each one passes the same gates the marker applied, from scratch: a real
+     * grid on this blueprint, a plain text column, a row that carries this
+     * id right now, a string within the ceiling. And the column's own rules,
+     * so a required key cannot be emptied from the page.
+     *
+     * @param  array<array-key, mixed>  $cells
+     * @return array<string, array<int, array<string, string>>>|JsonResponse
+     */
+    protected function readCells(Editor $editor, EntryContract $entry, array $cells): array|JsonResponse
+    {
+        $grouped = [];
+
+        foreach ($cells as $address => $value) {
+            $address = (string) $address;
+            $refused = $this->error(__('statamic-inline-edit::messages.error_field', ['field' => $address]), 422);
+
+            $parts = Cell::parse($address);
+
+            if ($parts === null) {
+                return $refused;
+            }
+
+            [$grid, $row, $column] = $parts;
+
+            $field = Cell::column($editor, $entry, $grid, $column);
+            $index = $field ? Cell::rowIndex($entry, $grid, $row) : null;
+
+            if ($field === null || $index === null) {
+                return $refused;
+            }
+
+            if (! is_string($value) && ! is_int($value) && ! is_float($value)) {
+                return $refused;
+            }
+
+            $value = (string) $value;
+
+            if (mb_strlen($value) > $editor->maxLength()) {
+                return $this->error(__('statamic-inline-edit::messages.error_long', ['field' => $address]), 422);
+            }
+
+            $value = str_replace("\u{00A0}", ' ', $value);
+
+            try {
+                Cell::grid($entry, $grid)->fieldtype()->fields($index)
+                    ->only($column)
+                    ->addValues([$column => $value])
+                    ->validator()
+                    ->withReplacements($this->replacements($entry))
+                    ->validate();
+            } catch (ValidationException $e) {
+                return $this->invalid($e);
+            }
+
+            $grouped[$grid][$index][$column] = $value;
+        }
+
+        return $grouped;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    protected function replacements(EntryContract $entry): array
+    {
+        return [
+            'id' => $entry->id(),
+            'collection' => $entry->collectionHandle(),
+            'site' => $entry->locale(),
+        ];
+    }
+
+    protected function invalid(ValidationException $e): JsonResponse
+    {
+        return response()->json([
+            'message' => __('statamic-inline-edit::messages.error_invalid'),
+            'errors' => $e->errors(),
+        ], 422);
     }
 
     /**

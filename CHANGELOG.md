@@ -1,5 +1,29 @@
 # Changelog
 
+## Unreleased
+
+### One cell of a grid can be edited on the page
+
+`InlineEdit::cell($entry, $grid, $rowId, $column, $label = null)` marks one
+cell: the row with this id, this column. For a site whose copy lives in grid
+rows (a headline, a button label, a list item, each its own row), which had no
+way in until now.
+
+- The row is named by the id core persists on it (`RowId`), never by its
+  position, so a row moved in the control panel between render and save cannot
+  pull the edit onto its neighbour. Rows without an id (written by a script,
+  never saved in the control panel) get no marker.
+- The address travels as the field handle `grid.rowId.column`. The script in
+  the browser is unchanged; it sends what the marker said.
+- Plain text columns only (the `fieldtypes` list). Toggles, selects, markdown
+  and assets inside a row get no marker and are refused on save.
+- The save route checks every cell from scratch: a real grid on the blueprint,
+  a text column, a row that carries this id right now, the ceiling, the
+  column's own validation rules. It writes that one value into the stored
+  rows and nothing else; the grid's own `process()` is not run, because it
+  rebuilds every row.
+- Entries under revisions get no cell marker, as the save route refuses them.
+
 ## 1.7.1
 
 ### Inserting a Bard set in inline/cp mode failed with 403
