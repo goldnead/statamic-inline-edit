@@ -1,5 +1,22 @@
 # Changelog
 
+## 1.8.1
+
+### A grid list stood one letter per line in the editor
+
+1.8.0 copied `grid-template-columns` along with a list's grid. Its computed
+value is the resolved track in pixels, read on a probe that is shrink-to-fit,
+so every item in the editor was a few pixels wide. It is no longer copied; a
+list gets one implicit column the editor's width.
+
+### Escape on an untouched field could count as a change
+
+Escape wrote the remembered text back as plain text. Where the template had
+dressed a value in markup of its own (a line break, a nowrap span), that
+flattened it, the text then read differently from its baseline, and opening
+and leaving a field without typing showed "1 unsaved". Escape now restores the
+markup as it was.
+
 ## 1.8.0
 
 ### Lists drawn with grid and `::before` looked bare in the editor

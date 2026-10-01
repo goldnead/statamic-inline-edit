@@ -254,6 +254,21 @@ await page.keyboard.press('Escape');
 check('the old text is back', (await intro.innerText()).startsWith('Im Chor'));
 check('and it is no longer counted', (await count.textContent()) === '1 unsaved');
 
+// Escape used to write the remembered innerText back as textContent. On a
+// value the template had dressed in markup (a line break, a nowrap span) that
+// flattened the markup, the text read differently afterwards, and opening and
+// leaving a field without typing counted as a change.
+{
+    const kicker = page.locator('[data-sie-field="kicker"]');
+    const before = await kicker.innerHTML();
+
+    await kicker.dblclick();
+    await page.keyboard.press('Escape');
+
+    check('escape on an untouched field with markup in it changes nothing', (await kicker.innerHTML()) === before, await kicker.innerHTML());
+    check('and it does not count', (await count.textContent()) === '1 unsaved', await count.textContent());
+}
+
 console.log('\nenter behaves by fieldtype');
 
 await intro.dblclick();
@@ -1120,6 +1135,16 @@ await looksAlike(
     field.locator('ul').first(), inner.locator('.ProseMirror ul').first(),
     ['display', 'row-gap']
 );
+// The column track of a grid list is computed to pixels, and a probe is
+// shrink-to-fit: copying it pinned every item to the probe's few pixels, and
+// the text stood one letter per line.
+{
+    const [item, editor] = await Promise.all([
+        inner.locator('.ProseMirror li').first().evaluate((el) => el.getBoundingClientRect().width),
+        inner.locator('.ProseMirror').evaluate((el) => el.getBoundingClientRect().width),
+    ]);
+    check('a grid list keeps its items as wide as the editor, not the probe', item > editor * 0.5, item + 'px of ' + editor + 'px');
+}
 await looksAlike(
     'a list item keeps its position, the anchor of its marker',
     field.locator('li').first(), inner.locator('.ProseMirror li').first(),

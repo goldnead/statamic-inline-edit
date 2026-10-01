@@ -64,6 +64,16 @@
 
     var STORAGE_KEY = 'statamic-inline-edit:on';
     var original = new WeakMap();
+    // The markup as well as the text, for Escape. Writing the remembered text
+    // back flattened whatever the template had put around it (a <br>, a
+    // nowrap span), and the field then read differently from its baseline.
+    var originalHtml = new WeakMap();
+
+    function remember(node) {
+        original.set(node, read(node));
+        originalHtml.set(node, node.innerHTML);
+    }
+
     var editing = false;
     var busy = false;
 
@@ -325,9 +335,7 @@
         //
         // Safe to do here because there can be nothing to lose. Fields are only
         // writable while editing is on, and switching it off discards first.
-        nodes.forEach(function (node) {
-            original.set(node, read(node));
-        });
+        nodes.forEach(remember);
 
         status('');
         paint();
@@ -1131,8 +1139,14 @@
      * How a list lays its items out. Only block, grid and flex mean anything
      * for a list; any other `display` is dropped, and the properties that
      * belong to one layout are dropped under the others.
+     *
+     * Not `grid-template-columns`: its computed value is the resolved track in
+     * pixels, measured on a probe that is shrink-to-fit. Copied, it pinned
+     * every item to a few pixels and the text stood one letter per line. A
+     * list without it gets one implicit column the editor's width, which is
+     * what a list of items is.
      */
-    var LAYOUT_PROPS = ['display', 'row-gap', 'column-gap', 'grid-template-columns', 'flex-direction'];
+    var LAYOUT_PROPS = ['display', 'row-gap', 'column-gap', 'flex-direction'];
 
     /**
      * What a drawn marker or quote mark needs to look the same: the pseudo
@@ -1520,7 +1534,6 @@
 
                 if (LAYOUT_PROPS.indexOf(prop) !== -1) {
                     if (prop === 'display' && ['block', 'grid', 'flex'].indexOf(value) === -1) return;
-                    if (prop === 'grid-template-columns' && (layout !== 'grid' || value === 'none')) return;
                     if (prop === 'flex-direction' && layout !== 'flex') return;
                 }
 
@@ -1867,7 +1880,7 @@
     }
 
     function revert(node) {
-        node.textContent = original.get(node);
+        node.innerHTML = originalHtml.get(node);
         stopEditing(node);
         paint();
     }
@@ -1889,7 +1902,7 @@
         attached.add(node);
         nodes.push(node);
 
-        original.set(node, read(node));
+        remember(node);
 
         // Marked at boot, not when edit mode comes on. An empty field has no
         // height of its own, and the box that makes it clickable is 23px
@@ -2106,7 +2119,7 @@
 
                 changed.forEach(function (node) {
                     clearPending(node);
-                    original.set(node, read(node));
+                    remember(node);
                     node.classList.toggle('sie-empty', read(node) === '');
                 });
 
