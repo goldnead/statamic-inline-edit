@@ -107,6 +107,12 @@ class Cell
             return null;
         }
 
+        // What the blueprint locks or hides in the control panel stays locked
+        // on the page too. Not the place to be more permissive than the CP.
+        if (in_array($field->visibility(), ['read_only', 'hidden', 'computed'], true)) {
+            return null;
+        }
+
         return $field;
     }
 
@@ -133,6 +139,13 @@ class Cell
             return null;
         }
 
+        // A localization that inherits this grid has no rows of its own.
+        // Writing one cell there would copy the whole inherited grid into it,
+        // and the localization would stop following its origin for good.
+        if (method_exists($entry, 'hasOrigin') && $entry->hasOrigin() && ! $entry->has($grid)) {
+            return null;
+        }
+
         $rows = $entry->get($grid);
 
         if (! is_array($rows)) {
@@ -140,14 +153,22 @@ class Cell
         }
 
         $handle = RowId::handle();
+        $found = [];
 
         foreach ($rows as $index => $stored) {
             if (is_array($stored) && isset($stored[$handle]) && (string) $stored[$handle] === $row) {
-                return is_int($index) ? $index : null;
+                $found[] = $index;
             }
         }
 
-        return null;
+        // Two rows with one id (a copied row, hand-edited YAML) are not an
+        // address. The first match would be a guess, and a guess here writes
+        // into a row the page may never have shown.
+        if (count($found) !== 1 || ! is_int($found[0])) {
+            return null;
+        }
+
+        return $found[0];
     }
 
     protected static function isHandle(string $value): bool

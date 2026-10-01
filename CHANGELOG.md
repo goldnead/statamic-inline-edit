@@ -23,6 +23,17 @@ way in until now.
   rows and nothing else; the grid's own `process()` is not run, because it
   rebuilds every row.
 - Entries under revisions get no cell marker, as the save route refuses them.
+- Refused as well, marker and save alike: a row id that occurs twice in the
+  grid (no guessing which row), a column the blueprint marks `read_only`,
+  `hidden` or `computed`, and a localization that inherits the grid from its
+  origin (one cell would copy the whole grid into the localization).
+
+Known limits:
+
+- Validation sees only the one column. A rule that compares columns of the same
+  row (`required_if`, `same`) cannot see the other cells and does not fire.
+- Clearing a cell stores `""`, not `null` as the control panel does for an
+  emptied text field. Both read as empty.
 
 ## 1.7.1
 

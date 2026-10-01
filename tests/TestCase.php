@@ -94,6 +94,8 @@ abstract class TestCase extends AddonTestCase
                 // the address every other marker of this row points at.
                 ['handle' => 'id', 'field' => ['type' => 'text']],
                 ['handle' => 'anzahl', 'field' => ['type' => 'integer']],
+                ['handle' => 'gesperrt', 'field' => ['type' => 'text', 'visibility' => 'read_only']],
+                ['handle' => 'versteckt', 'field' => ['type' => 'text', 'visibility' => 'hidden']],
             ]],
         ])->setHandle($handle)->setNamespace('collections.'.$handle);
 

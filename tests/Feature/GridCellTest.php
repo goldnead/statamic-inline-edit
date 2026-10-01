@@ -7,6 +7,7 @@ use Goldnead\StatamicInlineEdit\Tests\TestCase;
 use PHPUnit\Framework\Attributes\Test;
 use Statamic\Facades\Collection;
 use Statamic\Facades\Entry;
+use Statamic\Facades\Site;
 
 /**
  * One cell of a grid, addressed by the row's own id.
@@ -237,6 +238,76 @@ class GridCellTest extends TestCase
                 ->assertStatus(422);
         }
 
+        $this->assertSame($this->rows(), Entry::find('entry-1')->get('zeilen'));
+    }
+
+    #[Test]
+    public function a_row_id_that_occurs_twice_is_not_an_address(): void
+    {
+        $this->makeCollection();
+        $rows = $this->rows();
+        $rows[2]['id'] = 'r1';
+        $entry = $this->makeEntry(['title' => 'Hello', 'zeilen' => $rows]);
+
+        $this->actingAs($this->anEditor());
+
+        // Hand-edited YAML or a copied row: two rows, one id. Picking the
+        // first would put the edit in a row the page may not have shown.
+        $this->assertSame([], InlineEdit::cell($entry, 'zeilen', 'r1', 'wert'));
+
+        $this->postJson($this->url, $this->change(['zeilen.r1.wert' => 'Neu']))
+            ->assertStatus(422);
+
+        $this->assertSame($rows, Entry::find('entry-1')->get('zeilen'));
+    }
+
+    #[Test]
+    public function a_read_only_or_hidden_column_is_neither_marked_nor_written(): void
+    {
+        $entry = $this->anEntryWithRows();
+        $this->actingAs($this->anEditor());
+
+        foreach (['gesperrt', 'versteckt'] as $column) {
+            $this->assertSame([], InlineEdit::cell($entry, 'zeilen', 'r1', $column), $column);
+
+            $this->postJson($this->url, $this->change(["zeilen.r1.{$column}" => 'x']))
+                ->assertStatus(422);
+        }
+
+        $this->assertSame($this->rows(), Entry::find('entry-1')->get('zeilen'));
+    }
+
+    #[Test]
+    public function a_localization_that_inherits_the_grid_is_not_written(): void
+    {
+        config()->set('statamic.system.multisite', true);
+        config()->set('statamic.editions.pro', true);
+        Site::setSites([
+            'de' => ['name' => 'Deutsch', 'url' => '/', 'locale' => 'de_DE'],
+            'en' => ['name' => 'English', 'url' => '/en/', 'locale' => 'en_US'],
+        ]);
+
+        $this->makeCollection();
+        Collection::find('pages')->sites(['de', 'en'])->save();
+
+        $origin = Entry::make()->collection('pages')->locale('de')->id('entry-1')->slug('a-page')
+            ->data(['title' => 'Hallo', 'zeilen' => $this->rows()]);
+        $origin->save();
+
+        $localized = Entry::make()->collection('pages')->locale('en')->id('entry-en')->slug('a-page')
+            ->origin($origin)->data(['title' => 'Hello']);
+        $localized->save();
+
+        $this->actingAs($this->anEditor());
+
+        // Writing one cell would copy the whole inherited grid into the
+        // localization, and it would stop following the origin for good.
+        $this->assertSame([], InlineEdit::cell($localized, 'zeilen', 'r1', 'wert'));
+
+        $this->postJson($this->url, ['changes' => [['id' => 'entry-en', 'fields' => ['zeilen.r1.wert' => 'New']]]])
+            ->assertStatus(422);
+
+        $this->assertFalse(Entry::find('entry-en')->has('zeilen'));
         $this->assertSame($this->rows(), Entry::find('entry-1')->get('zeilen'));
     }
 
