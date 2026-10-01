@@ -71,7 +71,15 @@ abstract class TestCase extends AddonTestCase
             // The reason the one-field control panel panel exists: a whole
             // editor, which this addon does not rebuild and does not want to
             // hand over a whole entry form for.
-            'inhalt' => ['type' => 'bard', 'display' => 'Inhalt'],
+            // With a set, because inserting one asks core for it by the
+            // blueprint token — the round trip a one-field form can break.
+            'inhalt' => ['type' => 'bard', 'display' => 'Inhalt', 'sets' => [
+                'main' => ['display' => 'Main', 'sets' => [
+                    'zitat' => ['display' => 'Zitat', 'fields' => [
+                        ['handle' => 'quote', 'field' => ['type' => 'text', 'default' => 'Ein Zitat']],
+                    ]],
+                ]],
+            ]],
             'hero' => ['type' => 'assets', 'max_files' => 1],
         ])->setHandle($handle)->setNamespace('collections.'.$handle);
 

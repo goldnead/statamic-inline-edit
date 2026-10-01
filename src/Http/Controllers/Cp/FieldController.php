@@ -6,6 +6,7 @@ use Goldnead\StatamicInlineEdit\Http\Controllers\SaveController;
 use Goldnead\StatamicInlineEdit\Support\Editor;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Arr;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Statamic\Facades\Blueprint;
@@ -47,7 +48,7 @@ class FieldController extends CpController
         return Inertia::render('statamic-inline-edit::Field', [
             'handle' => $handle,
             'title' => $field->display(),
-            'blueprint' => $blueprint->toPublishArray(),
+            'blueprint' => $this->publishArray($entry, $blueprint),
             'values' => $fields->values()->all(),
             'meta' => $fields->meta()->all(),
             'saveUrl' => cp_route('inline-edit.field.update', [
@@ -154,6 +155,33 @@ class FieldController extends CpController
         }
 
         return [$fields->addValues([$handle => $entry->value($handle)])->preProcess(), $field, $blueprint];
+    }
+
+    /**
+     * The one-field blueprint as the publish form wants it, carrying the real
+     * blueprint's name and token.
+     *
+     * Bard's "insert set" asks core for the set's defaults and proves it may
+     * with the token the form carries. Core decrypts it and looks the
+     * blueprint up by its fully qualified handle — and a blueprint made from
+     * one field has none, so the answer was a 403. Bard Assist resolves its
+     * field the same way. The real blueprint is where that field lives, so
+     * the token names it.
+     *
+     * Only the name, not the one-field blueprint renamed. A blueprint's cache
+     * keys are its handle and namespace: one built with the real one's would
+     * write its single field into the real one's cache, and anything reading
+     * that blueprint later in the request — a save listener, the search index
+     * — would find one field where there are nine.
+     *
+     * @return array<string, mixed>
+     */
+    protected function publishArray($entry, \Statamic\Fields\Blueprint $blueprint): array
+    {
+        return array_merge(
+            $blueprint->toPublishArray(),
+            Arr::only($entry->blueprint()->toPublishArray(), ['fqh', 'token']),
+        );
     }
 
     protected function blueprintFor($entry, string $handle, Field $field, bool $inplace = false): \Statamic\Fields\Blueprint

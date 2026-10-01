@@ -185,6 +185,18 @@ reach the page: an iframe cannot let a click through part of itself. And the blo
 height it had, so the page does not reflow while the text grows — the frame covers more of what
 is under it, and the reload after saving puts it right.
 
+**Put the marker on the element that holds the text, not on a wrapper around it.** The frame
+goes over the marked element's outer box, and the text in it starts at the frame's edge. On a
+card or a column with padding, the page's text starts that padding further in, so the open
+editor sits off the page's lines by exactly that much. Mark the inner element, the one whose
+edges are the text's edges:
+
+```antlers
+<article class="card p-8">
+    {{ editable:content tag="div" }}
+</article>
+```
+
 Add or remove fieldtypes in `inline`. An entry under revisions gets the card instead, for the
 same reason it always did.
 

@@ -1,5 +1,33 @@
 # Changelog
 
+## 1.7.1
+
+### Inserting a Bard set in inline/cp mode failed with 403
+
+Pressing "+" in a Bard opened in the page or in the one-field panel and picking
+a set did nothing; the request behind it was refused with a 403. Any addon that
+asks the form's blueprint for a field the same way, Bard Assist among them,
+failed with it and showed "Unavailable".
+
+To add a set, Bard asks the control panel for its defaults and proves it may
+with the blueprint token the form carries. The control panel looks that
+blueprint up by name. The one-field form is built from a single field and had
+no name, so there was nothing to find. The token now names the entry's real
+blueprint, which is where the field lives. The form itself still holds only
+that one field, and saving still validates only that one field.
+
+The obvious fix, giving the one-field blueprint the real one's name, was tried
+and turned down: a blueprint's cache is keyed by its name, so the single field
+would have overwritten the real blueprint for the rest of the request, and a
+save listener or a search index reading it there would have seen one field. A
+test now keeps it that way.
+
+### Where the marker goes
+
+The README now says it: put the marker on the element that holds the text, not
+on a wrapper with padding. The open editor starts at the marked element's outer
+edge, so on a padded card it sits off the page's lines by the padding.
+
 ## 1.7.0
 
 ### The toolbar comes with the selection and goes with it
