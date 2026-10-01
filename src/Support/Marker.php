@@ -58,6 +58,89 @@ class Marker
     }
 
     /**
+     * The marker for one cell of a grid: the row with this id, this column.
+     *
+     * For a site whose copy lives in rows: a headline, a button label, a
+     * line of a list, each its own row of one grid. The row is named by the
+     * id core persists on it, never by its position, so a row moved in the
+     * control panel meanwhile cannot pull the edit onto its neighbour.
+     *
+     * Plain text columns only (`text` mode), and only rows that have an id.
+     * Rows written by a script or by hand have none until the control panel
+     * saves them once; those render bare, like any field we cannot address.
+     *
+     * `$label` is what the person editing sees above the cell. The default
+     * names the grid and the column, which is the same for every row; a
+     * caller that knows what the row is for can say so.
+     *
+     * @return array<string, string>
+     */
+    public function forCell(mixed $entry, string $grid, string $row, string $column, ?string $label = null): array
+    {
+        $editor = app(Editor::class);
+
+        if (! $editor->enabled() || ! $editor->user()) {
+            return [];
+        }
+
+        if (! $editor->canEdit($entry)) {
+            return [];
+        }
+
+        // The save route refuses entries under revisions, so a marker here
+        // could only lead to that refusal.
+        if (method_exists($entry, 'revisionsEnabled') && $entry->revisionsEnabled()) {
+            return [];
+        }
+
+        $field = Cell::column($editor, $entry, $grid, $column);
+
+        if ($field === null) {
+            return [];
+        }
+
+        $index = Cell::rowIndex($entry, $grid, $row);
+
+        if ($index === null) {
+            return [];
+        }
+
+        $editor->markRendered();
+
+        $type = (string) $field->type();
+
+        $attributes = [
+            'data-sie-id' => (string) $entry->id(),
+            'data-sie-field' => Cell::address($grid, $row, $column),
+            'data-sie-type' => $type,
+            'data-sie-mode' => 'text',
+            'data-sie-stamp' => $this->stamp($entry),
+        ];
+
+        $label ??= collect([Cell::grid($entry, $grid)?->display(), $field->display()])
+            ->filter(fn ($part) => is_string($part) && $part !== '')
+            ->implode(' › ');
+
+        if ($label !== '') {
+            $attributes['data-sie-label'] = $label;
+        }
+
+        if ($editor->isMultiline($type)) {
+            $attributes['data-sie-multiline'] = 'true';
+
+            // Here the stored text is known, unlike for a whole field marked
+            // from outside a template, so the flag can be exact.
+            $stored = $entry->get($grid)[$index][$column] ?? null;
+
+            if (is_string($stored) && str_contains($stored, "\n")) {
+                $attributes['data-sie-wraps'] = 'true';
+            }
+        }
+
+        return $attributes;
+    }
+
+    /**
      * The same thing as a string of HTML attributes, for a template engine
      * that has no way of spreading an array.
      */

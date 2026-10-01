@@ -81,6 +81,22 @@ abstract class TestCase extends AddonTestCase
                 ]],
             ]],
             'hero' => ['type' => 'assets', 'max_files' => 1],
+            // A grid whose cells are copy: the shape a site takes when its
+            // marketing text lives in rows rather than in one field per
+            // sentence. One column of each kind the cell path must tell
+            // apart — text it may write, a required one, and two it must not.
+            'zeilen' => ['type' => 'grid', 'display' => 'Zeilen', 'fields' => [
+                ['handle' => 'schluessel', 'field' => ['type' => 'text', 'validate' => ['required']]],
+                ['handle' => 'wert', 'field' => ['type' => 'textarea', 'display' => 'Wert']],
+                ['handle' => 'an', 'field' => ['type' => 'toggle']],
+                ['handle' => 'bild', 'field' => ['type' => 'assets', 'max_files' => 1]],
+                // Text, but named like the row's own id: writing it would move
+                // the address every other marker of this row points at.
+                ['handle' => 'id', 'field' => ['type' => 'text']],
+                ['handle' => 'anzahl', 'field' => ['type' => 'integer']],
+                ['handle' => 'gesperrt', 'field' => ['type' => 'text', 'visibility' => 'read_only']],
+                ['handle' => 'versteckt', 'field' => ['type' => 'text', 'visibility' => 'hidden']],
+            ]],
         ])->setHandle($handle)->setNamespace('collections.'.$handle);
 
         Blueprint::shouldReceive('in')

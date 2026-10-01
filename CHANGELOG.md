@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 1.8.0
 
 ### Lists drawn with grid and `::before` looked bare in the editor
 
@@ -12,6 +12,39 @@ marker. The probes now also read `display`, `row-gap`, `column-gap`,
 flex), `position` of list items and quotes, and the `::before` and `::after`
 of `li` and `blockquote` whenever they have content. Nothing else gets a
 pseudo rule, so the editor's own placeholder and handles are left alone.
+
+### One cell of a grid can be edited on the page
+
+`InlineEdit::cell($entry, $grid, $rowId, $column, $label = null)` marks one
+cell: the row with this id, this column. For a site whose copy lives in grid
+rows (a headline, a button label, a list item, each its own row), which had no
+way in until now.
+
+- The row is named by the id core persists on it (`RowId`), never by its
+  position, so a row moved in the control panel between render and save cannot
+  pull the edit onto its neighbour. Rows without an id (written by a script,
+  never saved in the control panel) get no marker.
+- The address travels as the field handle `grid.rowId.column`. The script in
+  the browser is unchanged; it sends what the marker said.
+- Plain text columns only (the `fieldtypes` list). Toggles, selects, markdown
+  and assets inside a row get no marker and are refused on save.
+- The save route checks every cell from scratch: a real grid on the blueprint,
+  a text column, a row that carries this id right now, the ceiling, the
+  column's own validation rules. It writes that one value into the stored
+  rows and nothing else; the grid's own `process()` is not run, because it
+  rebuilds every row.
+- Entries under revisions get no cell marker, as the save route refuses them.
+- Refused as well, marker and save alike: a row id that occurs twice in the
+  grid (no guessing which row), a column the blueprint marks `read_only`,
+  `hidden` or `computed`, and a localization that inherits the grid from its
+  origin (one cell would copy the whole grid into the localization).
+
+Known limits:
+
+- Validation sees only the one column. A rule that compares columns of the same
+  row (`required_if`, `same`) cannot see the other cells and does not fire.
+- Clearing a cell stores `""`, not `null` as the control panel does for an
+  emptied text field. Both read as empty.
 
 ## 1.7.2
 

@@ -52,6 +52,18 @@ class InlineEdit
     }
 
     /**
+     * The marker attributes for one cell of a grid, by the row's id.
+     *
+     *     'headline' => InlineEdit::cell($entry, 'rows', $row['id'], 'text'),
+     *
+     * @return array<string, string>
+     */
+    public static function cell(mixed $entry, string $grid, string $row, string $column, ?string $label = null): array
+    {
+        return app(Marker::class)->forCell($entry, $grid, $row, $column, $label);
+    }
+
+    /**
      * The same thing as a string of HTML attributes, already escaped.
      */
     public static function attributes(mixed $entry, string $handle): string
