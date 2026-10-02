@@ -375,7 +375,7 @@ check(
 // Every badge that is shown has to name its own mode. Not "four distinct
 // words": on this page the control and cp fields are single words in a row
 // of facts, too narrow for a badge, and they correctly have none.
-const WORDS = { text: 'Text', control: 'Value', source: 'Markdown', cp: 'Control panel' };
+const WORDS = { text: 'Text', control: 'Value', source: 'Markdown', cp: 'Control panel', image: 'Picture' };
 check(
     'and each one names its own kind',
     badges.every((b) => { const [mode, word] = b.split(':'); return word === '' || word === WORDS[mode]; }),
@@ -603,10 +603,59 @@ check('a select travels as the chosen key', sent.belegung === 'voll', JSON.strin
 check('markdown travels as its source', sent.body.startsWith('## **Ein Kapitel**'), JSON.stringify(sent.body));
 check('a date travels as a plain day', sent.starts_on === '2026-11-15', JSON.stringify(sent.starts_on));
 
+console.log('\na picture');
+
+const frame = page.locator('.sie-frame');
+
+await page.waitForTimeout(600);
+await page.goto(PAGE);
+await page.waitForSelector('.sie-bar');
+if (await page.locator('.sie-launch').isVisible()) {
+    await page.locator('.sie-launch').click();
+}
+
+const picture = page.locator('[data-sie-field="tokens.b1.value"]');
+const pictureBox = await picture.boundingBox();
+
+check('a picture is never an empty field', !(await picture.evaluate((el) => el.classList.contains('sie-empty'))));
+check('and gets no placeholder chip', !(await picture.evaluate((el) => el.hasAttribute('data-sie-placeholder'))));
+check('it keeps the size it has for a visitor', pictureBox.width === 160 && pictureBox.height === 90, JSON.stringify(pictureBox));
+check('it is outlined as editable', (await picture.evaluate((el) => getComputedStyle(el).outlineStyle)) === 'dashed');
+check('it says it is a picture', (await picture.evaluate((el) => el.dataset.sieBadge)) === 'Picture');
+check('and the cursor says click, not type', (await picture.evaluate((el) => getComputedStyle(el).cursor)) === 'pointer');
+
+await picture.click();
+await page.waitForTimeout(100);
+check('a click on a picture inside a link does not follow the link', !page.url().endsWith('#weggeklickt'), page.url());
+
+await picture.dblclick();
+check('a double-click opens the card', await page.locator('.sie-panel.sie-panel-card').isVisible());
+check('pointed at the picker the server signed', (await frame.getAttribute('src')) === 'about:blank#bild');
+check('and it is a card, not the screen', !(await page.locator('.sie-panel').evaluate((el) => el.classList.contains('sie-panel-full'))));
+
+// The frame says the asset browser is open: the card takes the screen.
+await page.evaluate(() => {
+    const f = document.querySelector('.sie-frame');
+    f.contentWindow.eval("parent.postMessage({ source: 'statamic-inline-edit', type: 'height', height: 260, full: true }, '*')");
+});
+await page.waitForTimeout(100);
+const fullBox = await frame.boundingBox();
+check('while the asset browser is open the card takes the screen', fullBox.height >= 800 - 40 && fullBox.width > 1000, JSON.stringify(fullBox));
+
+await page.evaluate(() => {
+    const f = document.querySelector('.sie-frame');
+    f.contentWindow.eval("parent.postMessage({ source: 'statamic-inline-edit', type: 'height', height: 260 }, '*')");
+});
+await page.waitForTimeout(100);
+const smallBox = await frame.boundingBox();
+check('and gives it back when the browser closes', smallBox.height === 260, JSON.stringify(smallBox));
+
+// Outside edit mode the link is a link again.
+check('nothing is pending after choosing in the card', await page.locator('.sie-save').isDisabled());
+
 console.log('\nthe control panel overlay');
 
 // Last, because closing it reloads the page on purpose.
-const frame = page.locator('.sie-frame');
 await page.waitForTimeout(600);
 await page.goto(PAGE);
 await page.waitForSelector('.sie-bar');

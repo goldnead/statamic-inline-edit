@@ -3,6 +3,7 @@
 namespace Goldnead\StatamicInlineEdit;
 
 use Goldnead\StatamicInlineEdit\Support\Assets;
+use Goldnead\StatamicInlineEdit\Support\Cell;
 use Goldnead\StatamicInlineEdit\Support\Editor;
 use Goldnead\StatamicInlineEdit\Support\Marker;
 
@@ -56,11 +57,40 @@ class InlineEdit
      *
      *     'headline' => InlineEdit::cell($entry, 'rows', $row['id'], 'text'),
      *
+     * A text cell that holds the path of a picture says so, and then opens
+     * the asset browser instead of a cursor. Only the public URL of an asset
+     * from an allowed container is ever written into it:
+     *
+     *     'hero' => InlineEdit::cell($entry, 'rows', $row['id'], 'value', 'Hero picture', image: true),
+     *
      * @return array<string, string>
      */
-    public static function cell(mixed $entry, string $grid, string $row, string $column, ?string $label = null): array
+    public static function cell(mixed $entry, string $grid, string $row, string $column, ?string $label = null, bool $image = false): array
     {
-        return app(Marker::class)->forCell($entry, $grid, $row, $column, $label);
+        return app(Marker::class)->forCell($entry, $grid, $row, $column, $label, $image);
+    }
+
+    /**
+     * Tell the addon which text cells hold pictures, so the text save route
+     * refuses them.
+     *
+     * The `image: true` on a marker is a statement about one page. The save
+     * route for text is stateless and takes any address a browser posts, so
+     * without this a picture cell could still be overwritten with typed text
+     * or a foreign URL from the console. Register once, in a service
+     * provider's boot():
+     *
+     *     InlineEdit::imageCells(fn (array $row, string $column) =>
+     *         $column === 'value' && str_ends_with($row['key'] ?? '', '.image'));
+     *
+     * The callable gets the stored row, the column, the entry and the grid
+     * handle. Null removes it.
+     *
+     * @param  (callable(array<string, mixed>, string, mixed, string): bool)|null  $test
+     */
+    public static function imageCells(?callable $test): void
+    {
+        Cell::treatAsImage($test);
     }
 
     /**

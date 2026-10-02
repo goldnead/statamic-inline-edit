@@ -4,6 +4,7 @@ namespace Goldnead\StatamicInlineEdit\Support;
 
 use Facades\Statamic\Fieldtypes\RowId;
 use Goldnead\StatamicInlineEdit\Http\Controllers\SaveController;
+use Illuminate\Validation\ValidationException;
 use Statamic\Fields\Field;
 
 /**
@@ -49,6 +50,42 @@ class Cell
         }
 
         return [$grid, $row, $column];
+    }
+
+    /**
+     * The site's own answer to "is this text cell really a picture".
+     *
+     * A marker made with `image: true` says so for the page it is on, but the
+     * text save route never sees that marker: it is stateless, and a browser
+     * console can post any address to it. Without this the picture cell would
+     * be guarded on the one route that offers it and open on the other.
+     *
+     * @var (\Closure(array<string, mixed>, string, mixed, string): bool)|null
+     */
+    protected static ?\Closure $imageTest = null;
+
+    /**
+     * @param  (callable(array<string, mixed>, string, mixed, string): bool)|null  $test
+     *                                                                                    the stored row, the column, the entry, the grid
+     */
+    public static function treatAsImage(?callable $test): void
+    {
+        self::$imageTest = $test === null ? null : \Closure::fromCallable($test);
+    }
+
+    /**
+     * Whether the site says this cell holds a picture. Never true without a
+     * test registered.
+     */
+    public static function isImage(mixed $entry, string $grid, int $index, string $column): bool
+    {
+        if (self::$imageTest === null) {
+            return false;
+        }
+
+        $row = $entry->get($grid)[$index] ?? null;
+
+        return is_array($row) && (bool) (self::$imageTest)($row, $column, $entry, $grid);
     }
 
     public static function address(string $grid, string $row, string $column): string
@@ -169,6 +206,43 @@ class Cell
         }
 
         return $found[0];
+    }
+
+    /**
+     * The value as the column stores it, after the column's own rules.
+     *
+     * Through the column's fieldtype, so an integer column stores an integer,
+     * the same as a save in the control panel would; and through its
+     * validation, so a required key cannot be emptied from the page. Shared
+     * by every route that writes a cell.
+     *
+     * @param  array<string, mixed>  $replacements
+     *
+     * @throws ValidationException
+     */
+    public static function process(mixed $entry, string $grid, int $index, string $column, mixed $value, array $replacements): mixed
+    {
+        $fields = self::grid($entry, $grid)->fieldtype()->fields($index)
+            ->only($column)
+            ->addValues([$column => $value]);
+
+        $fields->validator()->withReplacements($replacements)->validate();
+
+        return $fields->process()->values()->get($column);
+    }
+
+    /**
+     * Put one value into the stored rows, as it is.
+     *
+     * Not through the grid's own process(): that rebuilds every row, strips
+     * nulls and re-processes every other cell, and a one-word correction
+     * would rewrite the whole grid in the file. Does not save.
+     */
+    public static function put(mixed $entry, string $grid, int $index, string $column, mixed $value): void
+    {
+        $stored = $entry->get($grid);
+        $stored[$index][$column] = $value;
+        $entry->set($grid, $stored);
     }
 
     protected static function isHandle(string $value): bool

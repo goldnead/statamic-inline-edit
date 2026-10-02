@@ -146,12 +146,32 @@ class EditableTagTest extends TestCase
 
         $this->actingAs($this->anEditor());
 
+        // A grid: no list names it. (An assets field used to be the example
+        // here; pictures have their own mode now.)
+        $out = $this->render(
+            '{{ editable field="zeilen" }}<ul><li>Zeile</li></ul>{{ /editable }}',
+            $entry->toAugmentedArray()
+        );
+
+        $this->assertStringContainsString('data-sie-mode="cp"', $out);
+        $this->assertStringContainsString('<ul><li>Zeile</li></ul>', $out);
+    }
+
+    #[Test]
+    public function a_picture_opens_as_a_picture(): void
+    {
+        $this->makeCollection();
+        $entry = $this->makeEntry(['title' => 'Hello']);
+
+        $this->actingAs($this->anEditor());
+
         $out = $this->render(
             '{{ editable field="hero" }}<img src="x.jpg" alt="">{{ /editable }}',
             $entry->toAugmentedArray()
         );
 
-        $this->assertStringContainsString('data-sie-mode="cp"', $out);
+        $this->assertStringContainsString('data-sie-mode="image"', $out);
+        $this->assertStringContainsString('data-sie-field-url=', $out);
         $this->assertStringContainsString('<img src="x.jpg"', $out);
     }
 

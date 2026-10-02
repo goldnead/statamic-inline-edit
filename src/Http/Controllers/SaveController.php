@@ -144,19 +144,12 @@ class SaveController extends Controller
         $entry->merge($processed);
 
         // Cells go into the stored rows as they are, one value at a time.
-        // Not through the grid's own process(): that rebuilds every row,
-        // strips nulls and re-processes every other cell, and a one-word
-        // correction would rewrite the whole grid in the file.
         foreach ($cells as $grid => $rows) {
-            $stored = $entry->get($grid);
-
             foreach ($rows as $index => $columns) {
                 foreach ($columns as $column => $value) {
-                    $stored[$index][$column] = $value;
+                    Cell::put($entry, $grid, $index, $column, $value);
                 }
             }
-
-            $entry->set($grid, $stored);
         }
 
         $entry->save();
@@ -265,6 +258,12 @@ class SaveController extends Controller
                 return $refused;
             }
 
+            // A picture cell, by the site's own test: only its picker writes
+            // it, and only with the URL of an asset. Typed text never.
+            if (Cell::isImage($entry, $grid, $index, $column)) {
+                return $refused;
+            }
+
             if (! is_string($value) && ! is_int($value) && ! is_float($value)) {
                 return $refused;
             }
@@ -277,21 +276,11 @@ class SaveController extends Controller
 
             $value = str_replace("\u{00A0}", ' ', $value);
 
-            $columnFields = Cell::grid($entry, $grid)->fieldtype()->fields($index)
-                ->only($column)
-                ->addValues([$column => $value]);
-
             try {
-                $columnFields->validator()
-                    ->withReplacements($this->replacements($entry))
-                    ->validate();
+                $grouped[$grid][$index][$column] = Cell::process($entry, $grid, $index, $column, $value, $this->replacements($entry));
             } catch (ValidationException $e) {
                 return $this->invalid($e);
             }
-
-            // Through the column's own fieldtype, so an integer column stores
-            // an integer, the same as a save in the control panel would.
-            $grouped[$grid][$index][$column] = $columnFields->process()->values()->get($column);
         }
 
         return $grouped;

@@ -94,6 +94,18 @@
      */
     var pending = new Map();
 
+    /**
+     * Does this marker need the empty-field chip?
+     *
+     * A picture has no text, ever: an <img> or a box with a background. Read
+     * as text it is always empty, and the chip it then got (a min-width
+     * pseudo-element, a placeholder) would sit on top of the very picture
+     * the person is looking at.
+     */
+    function isBlank(node) {
+        return node.dataset.sieMode !== 'image' && read(node) === '';
+    }
+
     function dirty() {
         return nodes.filter(function (node) {
             if (pending.has(node)) return true;
@@ -138,6 +150,7 @@
         source: L.badge_source || 'Markdown',
         inline: L.badge_inline || 'Editor',
         cp: L.badge_cp || 'Control Panel',
+        image: L.badge_image || 'Bild',
     };
 
     /**
@@ -292,9 +305,9 @@
             delete node.dataset.sieBadge;
         }
 
-        node.classList.toggle('sie-empty', read(node) === '');
+        node.classList.toggle('sie-empty', isBlank(node));
 
-        if (read(node) === '') node.setAttribute('data-sie-placeholder', placeholder(node));
+        if (isBlank(node)) node.setAttribute('data-sie-placeholder', placeholder(node));
     }
 
     function setEditing(on) {
@@ -362,7 +375,9 @@
         if (mode === 'control') return openControl(node);
         if (mode === 'source') return openSource(node);
         if (mode === 'inline') return openInplace(node);
-        if (mode === 'cp') return openPanel(node);
+        // A picture is the same card, holding the asset field; the asset
+        // browser is core's, behind it.
+        if (mode === 'cp' || mode === 'image') return openPanel(node);
 
         return startEditing(node);
     }
@@ -1718,6 +1733,7 @@
         // reports its own height, so the panel never flashes at full screen
         // on the way to being small.
         panel.classList.toggle('sie-panel-card', !!single);
+        panel.classList.remove('sie-panel-full');
         panel.style.removeProperty('--sie-frame-height');
 
         panel.hidden = false;
@@ -1760,6 +1776,12 @@
         if (!data || data.source !== 'statamic-inline-edit') return;
 
         if (data.type === 'height' && frame.dataset.sieSingle) {
+            // The asset browser is a stack over the whole document it lives
+            // in, and that document is this frame. At the height of one asset
+            // field it would be a strip of thumbnails. While it is open the
+            // card takes the screen; when it closes, the form's own height
+            // comes back with the next message.
+            panel.classList.toggle('sie-panel-full', !!data.full);
             panel.style.setProperty('--sie-frame-height', Math.max(120, data.height | 0) + 'px');
 
             return;
@@ -1876,7 +1898,7 @@
 
         node.removeAttribute('contenteditable');
         node.classList.remove('sie-active');
-        node.classList.toggle('sie-empty', read(node) === '');
+        node.classList.toggle('sie-empty', isBlank(node));
     }
 
     function revert(node) {
@@ -1909,12 +1931,21 @@
         // tall: added on the toggle, it pushes the whole page down at the
         // moment somebody starts working. Here the space is there from the
         // first paint and only the chip's ink arrives later.
-        node.classList.toggle('sie-empty', read(node) === '');
+        node.classList.toggle('sie-empty', isBlank(node));
 
         node.addEventListener('dblclick', function (event) {
             if (!editing) return;
             event.preventDefault();
             open(node);
+        });
+
+        // A picture is often the inside of a link (a teaser, a project card).
+        // The first click of the double-click would follow it, and the person
+        // lands on another page instead of in the asset browser. While edit
+        // mode is on, the click on a picture belongs to the picture.
+        node.addEventListener('click', function (event) {
+            if (!editing || node.dataset.sieMode !== 'image') return;
+            if (node.closest('a, button')) event.preventDefault();
         });
 
         // A double-click is a mouse gesture. On a touch screen a double-tap is
@@ -2120,7 +2151,7 @@
                 changed.forEach(function (node) {
                     clearPending(node);
                     remember(node);
-                    node.classList.toggle('sie-empty', read(node) === '');
+                    node.classList.toggle('sie-empty', isBlank(node));
                 });
 
                 status(L.saved || 'Saved', 'ok');

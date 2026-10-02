@@ -66,6 +66,9 @@ class FieldController extends CpController
             // nothing about who may save it — only the chrome around the
             // field, which is why it may come from the query string.
             'inplace' => $inplace,
+            // A picture: the asset browser opens with the card, because a
+            // double-click on an image means "another one".
+            'picker' => ! $inplace && app(Editor::class)->modeFor($field->type()) === 'image',
             'labels' => [
                 'save' => __('statamic-inline-edit::messages.save'),
                 'saving' => __('statamic-inline-edit::messages.saving'),

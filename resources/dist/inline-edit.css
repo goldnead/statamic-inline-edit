@@ -404,7 +404,8 @@
 .sie-editing [data-sie-field][data-sie-mode="control"],
 .sie-editing [data-sie-field][data-sie-mode="source"],
 .sie-editing [data-sie-field][data-sie-mode="inline"],
-.sie-editing [data-sie-field][data-sie-mode="cp"] {
+.sie-editing [data-sie-field][data-sie-mode="cp"],
+.sie-editing [data-sie-field][data-sie-mode="image"] {
     cursor: pointer;
 
     /* A double-click on text selects a word, and here the text is a button,
@@ -926,6 +927,17 @@
     /* Whatever the form says, it never grows past the window. Past that
        point the frame scrolls, which is the browser's job and not ours. */
     max-height: calc(100vh - 32px);
+}
+
+/* The asset browser is open inside the card. It is core's stack, laid over
+   the whole document it lives in, and that document is the frame: the card
+   has to be the screen for as long as it is there. */
+.sie-panel.sie-panel-card.sie-panel-full {
+    width: min(1180px, calc(100vw - 32px));
+}
+
+.sie-panel.sie-panel-card.sie-panel-full .sie-frame {
+    height: calc(100vh - 32px);
 }
 
 /* ---------------------------------------------- the field, in place

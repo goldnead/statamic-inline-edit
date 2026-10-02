@@ -1,6 +1,7 @@
 <?php
 
 use Goldnead\StatamicInlineEdit\Http\Controllers\Cp\FieldController;
+use Goldnead\StatamicInlineEdit\Http\Controllers\Cp\ImageCellController;
 use Illuminate\Support\Facades\Route;
 
 /**
@@ -18,3 +19,14 @@ Route::get('inline-edit/field/{collection}/{entry}/{handle}', [FieldController::
 
 Route::patch('inline-edit/field/{collection}/{entry}/{handle}', [FieldController::class, 'update'])
     ->name('inline-edit.field.update');
+
+/**
+ * The asset browser for a text cell that holds the path of a picture. Signed:
+ * the marker on the page is the only thing that hands out these addresses,
+ * and the signature is how the route knows it did.
+ */
+Route::get('inline-edit/image/{collection}/{entry}/{address}', [ImageCellController::class, 'show'])
+    ->name('inline-edit.image.edit');
+
+Route::patch('inline-edit/image/{collection}/{entry}/{address}', [ImageCellController::class, 'store'])
+    ->name('inline-edit.image.update');

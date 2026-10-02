@@ -170,6 +170,52 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Pictures
+    |--------------------------------------------------------------------------
+    |
+    | Fieldtypes that open as a picture: double-click the image on the page and
+    | the control panel's own asset field opens in a card, with the real asset
+    | browser behind it. Choose another picture or upload one, save, and the
+    | page reloads with it. Saved exactly as the control panel saves it.
+    |
+    | Mark the element that shows the picture, an <img> or anything with the
+    | picture as its background:
+    |
+    |     <img {...heroMarker} src={hero.url} alt={hero.alt} />
+    |
+    | Entries under revisions keep the whole entry form, as everywhere else.
+    |
+    */
+
+    'images' => [
+        'assets',
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Containers a picture cell may point into
+    |--------------------------------------------------------------------------
+    |
+    | For a site that keeps the path of a picture in a plain text cell of a
+    | grid rather than in an assets field:
+    |
+    |     InlineEdit::cell($entry, 'tokens', $rowId, 'value', 'Hero picture', image: true)
+    |
+    | The cell opens the same asset browser. What is written back is the public
+    | URL of the chosen asset, and nothing else is accepted: not a string that
+    | was typed, not a URL from somewhere else, not an asset from a container
+    | missing here. A container without public URLs never qualifies.
+    |
+    | Empty switches picture cells off.
+    |
+    */
+
+    'image_containers' => [
+        'assets',
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Inject the editor automatically
     |--------------------------------------------------------------------------
     |

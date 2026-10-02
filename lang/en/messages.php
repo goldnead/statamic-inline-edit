@@ -33,6 +33,7 @@ return [
     'badge_source' => 'Markdown',
     'badge_inline' => 'Editor',
     'badge_cp' => 'Control panel',
+    'badge_image' => 'Picture',
 
     'error_auth' => 'You are not signed in.',
     'error_forbidden' => 'You may not edit this entry.',
@@ -41,6 +42,7 @@ return [
     'error_field' => 'The field ":field" cannot be edited on the page.',
     'error_long' => 'The field ":field" is too long.',
     'error_invalid' => 'That did not pass validation.',
+    'error_image' => 'Please choose one picture from the asset browser.',
     'error_conflict' => 'Someone else changed this entry after the page was loaded.',
 
 ];

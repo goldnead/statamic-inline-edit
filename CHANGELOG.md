@@ -1,5 +1,50 @@
 # Changelog
 
+## 1.9.0 (unreleased)
+
+### Pictures
+
+Double-click a picture in edit mode, and the control panel's own asset
+browser opens: choose another one or upload one, save, and the page reloads
+with it. A new mode, `image`, for two kinds of target:
+
+- **An `assets` field** on the entry (new config list `images`, default
+  `['assets']`). It opens the one-field card with core's asset field, the
+  browser already open, and is saved exactly as the control panel saves it.
+  Under revisions it falls back to the whole entry form, as everything does.
+- **A text cell in a grid that holds the path of a picture**, the shape a
+  site takes when its pictures live as token rows:
+  `InlineEdit::cell($entry, 'tokens', $rowId, 'value', 'Hero', image: true)`.
+  The cell opens the same browser through a new control panel route,
+  `/cp/inline-edit/image/{collection}/{entry}/{grid.row.column}`, and what is
+  written is the public URL of the chosen asset, nothing else: not a typed
+  string, not a foreign URL, not an asset from a container missing from the
+  new `image_containers` list (default `['assets']`), never a private one.
+  The route's address is **signed** by the marker, so a cell the page never
+  offered as a picture (the headline beside it) cannot be written through it.
+  Same gates as a text cell otherwise: entry policy, revisions, an inherited
+  grid in a localization, a duplicated row id, read-only columns.
+- **`InlineEdit::imageCells(callable)`** tells the text save route which
+  cells are pictures, so it refuses them. The `image: true` on a marker speaks
+  for one page; the text route is stateless and would otherwise take a
+  foreign URL posted from the console.
+
+On the page: a picture is never an "empty field" (no chip over the image),
+gets the badge "Picture" (drawn on a box with a background picture; an
+`<img>` cannot draw pseudo-elements and keeps the outline only), takes the
+pointer cursor, and a click on a picture
+inside a link no longer follows the link while edit mode is on. The card
+takes the screen while the asset browser is open and gives it back after.
+
+### The card had no portal targets
+
+Core's stacks and modals teleport into `#portal-target-<id>`, which the full
+control panel layout draws and the chrome-less card did not. The asset
+browser, an asset's editor and any other stack had nowhere to go; Browse threw
+inside Vue and showed nothing. The card's layout now draws the targets,
+including core's `stacks-on-stacks` class, without which a stack is zero
+pixels tall.
+
 ## 1.8.1
 
 ### A grid list stood one letter per line in the editor

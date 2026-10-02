@@ -97,6 +97,8 @@ class Editor
      *              rendered output is swapped for its own source
      *  - `inline`  the real control panel field, but put where the content
      *              was instead of over it — for a Bard, which *is* the page
+     *  - `image`   a picture: the control panel's own asset field, in the
+     *              card, so the real asset browser chooses or uploads
      *  - `cp`      nothing we can do justice to here, so the control panel
      *              opens over the page
      *
@@ -125,6 +127,14 @@ class Editor
             return null;
         }
 
+        // A picture is the control panel field too, in the same card as `cp`.
+        // Its own mode because the page has to treat it differently: an image
+        // has no text, so it is never "empty", and what it needs is the asset
+        // browser rather than a form.
+        if (in_array($type, (array) config('statamic-inline-edit.images', []), true)) {
+            return 'image';
+        }
+
         // Both of these open the same control panel field. The difference is
         // only where the frame is put, so `inline` degrades to `cp` the moment
         // the one-field route is unavailable — that decision needs the entry
@@ -145,6 +155,19 @@ class Editor
     public function isWritableMode(?string $mode): bool
     {
         return in_array($mode, ['text', 'control', 'source'], true);
+    }
+
+    /**
+     * The asset containers a picture cell may point into.
+     *
+     * Only these, and only those whose assets have a public URL: the value
+     * written is that URL, and a private container has none.
+     *
+     * @return array<int, string>
+     */
+    public function imageContainers(): array
+    {
+        return array_values(array_filter((array) config('statamic-inline-edit.image_containers', []), 'is_string'));
     }
 
     public function isMultiline(?string $type): bool

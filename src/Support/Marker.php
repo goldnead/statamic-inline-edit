@@ -75,8 +75,12 @@ class Marker
      *
      * @return array<string, string>
      */
-    public function forCell(mixed $entry, string $grid, string $row, string $column, ?string $label = null): array
+    public function forCell(mixed $entry, string $grid, string $row, string $column, ?string $label = null, bool $image = false): array
     {
+        if ($image) {
+            return $this->forImageCell($entry, $grid, $row, $column, $label);
+        }
+
         $editor = app(Editor::class);
 
         if (! $editor->enabled() || ! $editor->user()) {
@@ -102,6 +106,12 @@ class Marker
         $index = Cell::rowIndex($entry, $grid, $row);
 
         if ($index === null) {
+            return [];
+        }
+
+        // The save route would refuse it as text; the picture marker is the
+        // way in.
+        if (Cell::isImage($entry, $grid, $index, $column)) {
             return [];
         }
 
@@ -135,6 +145,72 @@ class Marker
             if (is_string($stored) && str_contains($stored, "\n")) {
                 $attributes['data-sie-wraps'] = 'true';
             }
+        }
+
+        return $attributes;
+    }
+
+    /**
+     * The marker for a text cell that holds the path of a picture.
+     *
+     * The column is a string and the browser could send any string back, so
+     * this cell never goes through the text save route's way of thinking. It
+     * opens the asset browser instead, through a control panel route whose
+     * address is signed here: the signature is the server's own record that
+     * it offered *this* cell of *this* entry as a picture, so a headline next
+     * to it cannot be turned into one, and the route has nothing to trust
+     * from the page but that.
+     *
+     * Every gate a text cell passes, passed here too, plus: picture cells are
+     * switched on (at least one allowed container), and the route exists.
+     *
+     * @return array<string, string>
+     */
+    protected function forImageCell(mixed $entry, string $grid, string $row, string $column, ?string $label): array
+    {
+        $editor = app(Editor::class);
+
+        if (! $editor->enabled() || ! $editor->user() || ! config('statamic-inline-edit.control_panel', true)) {
+            return [];
+        }
+
+        if ($editor->imageContainers() === [] || ! $editor->canEdit($entry)) {
+            return [];
+        }
+
+        if (method_exists($entry, 'revisionsEnabled') && $entry->revisionsEnabled()) {
+            return [];
+        }
+
+        $field = Cell::column($editor, $entry, $grid, $column);
+
+        if ($field === null || Cell::rowIndex($entry, $grid, $row) === null) {
+            return [];
+        }
+
+        $url = ImageCell::url($entry, Cell::address($grid, $row, $column), $label);
+
+        if ($url === null) {
+            return [];
+        }
+
+        $editor->markRendered();
+
+        $attributes = [
+            'data-sie-id' => (string) $entry->id(),
+            'data-sie-field' => Cell::address($grid, $row, $column),
+            'data-sie-type' => (string) $field->type(),
+            'data-sie-mode' => 'image',
+            'data-sie-reload' => 'true',
+            'data-sie-field-url' => $url,
+        ];
+
+        $label ??= collect([Cell::grid($entry, $grid)?->display(), $field->display()])
+            ->filter(fn ($part) => is_string($part) && $part !== '')
+            ->implode(' › ');
+
+        if ($label !== '') {
+            $attributes['data-sie-label'] = $label;
         }
 
         return $attributes;
@@ -201,13 +277,15 @@ class Marker
         if ($mode === null) {
             return [[], ''];
         }
-        $fieldUrl = in_array($mode, ['cp', 'inline'], true) ? $this->fieldUrl($entry, $handle) : null;
+        $fieldUrl = in_array($mode, ['cp', 'inline', 'image'], true) ? $this->fieldUrl($entry, $handle) : null;
 
         // Editing in place needs the one-field route. Where it is missing — an
         // entry under revisions, an older published copy without the route —
         // the only thing left is the whole entry form, and that cannot stand
         // in the column the article is read in. So: the card, as before.
-        if ($mode === 'inline' && $fieldUrl === null) {
+        // A picture the same: without the one field there is no picker of its
+        // own, only the entry form with the picture somewhere in it.
+        if (in_array($mode, ['inline', 'image'], true) && $fieldUrl === null) {
             $mode = 'cp';
         }
 
@@ -263,7 +341,7 @@ class Marker
         // control panel lives wherever `statamic.cp.route` says, which a
         // script on the frontend has no way of knowing, and a guessed `/cp`
         // would send half the installations to a 404.
-        if (in_array($mode, ['cp', 'inline'], true)) {
+        if (in_array($mode, ['cp', 'inline', 'image'], true)) {
             if ($url = $this->panelUrl($entry)) {
                 $attributes['data-sie-cp'] = $url;
             }

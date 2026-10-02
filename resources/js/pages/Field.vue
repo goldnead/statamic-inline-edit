@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, onMounted, onBeforeUnmount } from 'vue';
+import { h, ref, computed, onMounted, onBeforeUnmount } from 'vue';
 import {
     Alert,
     Button,
@@ -19,8 +19,21 @@ const props = defineProps([
     'csrfToken',
     'readOnly',
     'inplace',    // the frame stands where the content stood, not on a card
+    'picker',     // a picture: open the asset browser straight away
     'labels',     // { save, saving, close, failed }
 ]);
+
+/**
+ * Is one of core's stacks or dialogs open over the form — the asset browser,
+ * an asset's editor, a confirmation?
+ *
+ * They are laid over the whole document, and this document is the frame. At
+ * the height of one asset field the asset browser would be a strip of
+ * thumbnails, so while one is open the card asks for the screen.
+ */
+function overlayOpen() {
+    return !! document.querySelector('[role="dialog"], .stack, [data-ui-stack-content]');
+}
 
 /**
  * No control panel chrome.
@@ -36,8 +49,30 @@ const props = defineProps([
  */
 defineOptions({
     layout: {
+        // Except for the portal targets. Core's stacks and modals (the asset
+        // browser, an asset's editor, Bard's link dialog) teleport into
+        // `#portal-target-<id>`, and those elements are drawn by the full
+        // layout. Without them the asset browser had nowhere to go: Browse did
+        // nothing but throw inside Vue's transition code. Same markup as core's
+        // PortalTargets, which is not exported for addons.
+        computed: {
+            portals() {
+                return this.$portals?.all?.() ?? [];
+            },
+            // Core's stack CSS only positions a stack under this class; without
+            // it the asset browser opens at a height of zero.
+            hasStacks() {
+                return (this.$stacks?.count?.() ?? 0) > 0;
+            },
+        },
         render() {
-            return this.$slots.default?.();
+            return [
+                this.$slots.default?.(),
+                h('div', { class: ['portal-targets', { 'stacks-on-stacks': this.hasStacks }] }, this.portals.map((portal) => h('div', {
+                    key: portal.id,
+                    id: `portal-target-${portal.id}`,
+                }))),
+            ];
         },
     },
 });
@@ -117,7 +152,33 @@ async function save() {
  * an asset picker is a different height the moment it has a picture in it.
  */
 let observer = null;
+let overlays = null;
 const root = ref(null);
+
+/**
+ * A double-click on a picture means "another picture", so the asset browser
+ * opens with the card rather than one click later.
+ *
+ * Core's asset field opens it from its own Browse button, and that button is
+ * the only handle there is: no event, no prop. Looked for until the field has
+ * mounted, clicked once, and if it is never found the card simply shows the
+ * field with its button, which is where the person would have clicked anyway.
+ */
+function openBrowser() {
+    const deadline = Date.now() + 4000;
+
+    (function look() {
+        const button = root.value?.querySelector('[data-browse], .assets-fieldtype button, .assets-fieldtype-picker button');
+
+        if (button) {
+            button.click();
+
+            return;
+        }
+
+        if (Date.now() < deadline) setTimeout(look, 100);
+    })();
+}
 
 function reportHeight() {
     // The form's own box, never `documentElement.scrollHeight`. The document
@@ -130,7 +191,7 @@ function reportHeight() {
     const height = Math.ceil(top + root.value.offsetHeight);
 
     if (! props.inplace) {
-        tell('height', { height });
+        tell('height', { height, full: overlayOpen() });
 
         return;
     }
@@ -155,6 +216,11 @@ function reportHeight() {
 }
 
 function onKeydown(event) {
+    // Escape inside the asset browser closes the browser, which is core's
+    // own handling. Closing the whole card with it would throw away the
+    // picture that was just chosen.
+    if (event.key === 'Escape' && overlayOpen()) return;
+
     if (event.key === 'Escape') {
         tell('close');
 
@@ -228,6 +294,15 @@ onMounted(() => {
     observer = new ResizeObserver(reportHeight);
     observer.observe(root.value);
 
+    // Stacks and dialogs are mounted outside this form, so the form's size
+    // does not change when one opens. Watched separately, for the card only.
+    if (! props.inplace) {
+        overlays = new MutationObserver(() => requestAnimationFrame(reportHeight));
+        overlays.observe(document.body, { childList: true, subtree: true });
+    }
+
+    if (props.picker) openBrowser();
+
     document.addEventListener('keydown', onKeydown);
     window.addEventListener('message', onMessage);
 
@@ -251,6 +326,7 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
     observer?.disconnect();
+    overlays?.disconnect();
     document.removeEventListener('keydown', onKeydown);
     window.removeEventListener('message', onMessage);
 });

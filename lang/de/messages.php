@@ -33,6 +33,7 @@ return [
     'badge_source' => 'Markdown',
     'badge_inline' => 'Editor',
     'badge_cp' => 'Control Panel',
+    'badge_image' => 'Bild',
 
     'error_auth' => 'Du bist nicht angemeldet.',
     'error_forbidden' => 'Du darfst diesen Eintrag nicht bearbeiten.',
@@ -41,6 +42,7 @@ return [
     'error_field' => 'Das Feld „:field" lässt sich auf der Seite nicht bearbeiten.',
     'error_long' => 'Das Feld „:field" ist zu lang.',
     'error_invalid' => 'Das hat die Prüfung nicht bestanden.',
+    'error_image' => 'Bitte genau ein Bild aus dem Asset-Browser wählen.',
     'error_conflict' => 'Jemand anders hat den Eintrag geändert, nachdem die Seite geladen wurde.',
 
 ];
