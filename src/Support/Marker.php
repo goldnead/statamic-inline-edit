@@ -75,10 +75,10 @@ class Marker
      *
      * @return array<string, string>
      */
-    public function forCell(mixed $entry, string $grid, string $row, string $column, ?string $label = null, bool $image = false): array
+    public function forCell(mixed $entry, string $grid, string $row, string $column, ?string $label = null, bool $image = false, ?string $alt = null, bool $source = false): array
     {
         if ($image) {
-            return $this->forImageCell($entry, $grid, $row, $column, $label);
+            return $this->forImageCell($entry, $grid, $row, $column, $label, $alt);
         }
 
         $editor = app(Editor::class);
@@ -135,13 +135,20 @@ class Marker
             $attributes['data-sie-label'] = $label;
         }
 
+        $stored = $entry->get($grid)[$index][$column] ?? null;
+
+        // What the cell holds, for a page that draws it differently. The
+        // script shows this while the cell is edited, so what is typed into
+        // is the value and not its rendering.
+        if ($source) {
+            $attributes['data-sie-source'] = is_scalar($stored) ? (string) $stored : '';
+        }
+
         if ($editor->isMultiline($type)) {
             $attributes['data-sie-multiline'] = 'true';
 
             // Here the stored text is known, unlike for a whole field marked
             // from outside a template, so the flag can be exact.
-            $stored = $entry->get($grid)[$index][$column] ?? null;
-
             if (is_string($stored) && str_contains($stored, "\n")) {
                 $attributes['data-sie-wraps'] = 'true';
             }
@@ -166,7 +173,7 @@ class Marker
      *
      * @return array<string, string>
      */
-    protected function forImageCell(mixed $entry, string $grid, string $row, string $column, ?string $label): array
+    protected function forImageCell(mixed $entry, string $grid, string $row, string $column, ?string $label, ?string $alt = null): array
     {
         $editor = app(Editor::class);
 
@@ -188,7 +195,14 @@ class Marker
             return [];
         }
 
-        $url = ImageCell::url($entry, Cell::address($grid, $row, $column), $label);
+        // The alt row only when it is one the card could write: a text row of
+        // its own, not this picture and not another one. Otherwise the card
+        // is the picture alone, and the page still works.
+        if ($alt !== null && ! ImageCell::altRowFits($entry, $grid, $row, $alt)) {
+            $alt = null;
+        }
+
+        $url = ImageCell::url($entry, Cell::address($grid, $row, $column), $label, $alt);
 
         if ($url === null) {
             return [];

@@ -37,26 +37,48 @@ class ImageCellController extends FieldController
      */
     public const HANDLE = 'asset';
 
+    /**
+     * The second field, for the picture's alt text, when the marker named a
+     * row for it.
+     */
+    public const ALT = 'alt_text';
+
     public function show(Request $request, $collection, $entry, string $address)
     {
         $this->authorize('view', $entry);
 
         [$grid, $index, $column, $field] = $this->cell($request, $entry, $address);
+        $altIndex = $this->altIndex($request, $entry, $grid, $address);
 
         $editor = app(Editor::class);
         $current = ImageCell::current($editor, $entry->get($grid)[$index][$column] ?? null);
 
-        $blueprint = Blueprint::makeFromFields([self::HANDLE => [
+        $config = [self::HANDLE => [
             'type' => 'assets',
             'display' => $request->query('label') ?: $field->display(),
             'container' => $editor->imageContainers()[0],
             'max_files' => 1,
             'mode' => 'grid',
             'allow_uploads' => true,
-        ]])->setParent($entry);
+        ]];
+
+        $values = [self::HANDLE => $current ? [$current->id()] : []];
+
+        if ($altIndex !== null) {
+            $config[self::ALT] = [
+                'type' => 'text',
+                'display' => __('statamic-inline-edit::messages.alt'),
+                'instructions' => __('statamic-inline-edit::messages.alt_instructions'),
+            ];
+
+            $stored = $entry->get($grid)[$altIndex][$column] ?? null;
+            $values[self::ALT] = is_scalar($stored) ? (string) $stored : '';
+        }
+
+        $blueprint = Blueprint::makeFromFields($config)->setParent($entry);
 
         $fields = $blueprint->fields()
-            ->addValues([self::HANDLE => $current ? [$current->id()] : []])
+            ->addValues($values)
             ->preProcess();
 
         return Inertia::render('statamic-inline-edit::Field', [
@@ -65,11 +87,12 @@ class ImageCellController extends FieldController
             'blueprint' => $this->publishArray($entry, $blueprint),
             'values' => $fields->values()->all(),
             'meta' => $fields->meta()->all(),
-            'saveUrl' => URL::signedRoute('statamic.cp.inline-edit.image.update', [
+            'saveUrl' => URL::signedRoute('statamic.cp.inline-edit.image.update', array_filter([
                 'collection' => $collection->handle(),
                 'entry' => $entry->id(),
                 'address' => $address,
-            ], absolute: false),
+                'alt' => $altIndex !== null ? (string) $request->query('alt') : null,
+            ], fn ($v) => $v !== null), absolute: false),
             'csrfToken' => csrf_token(),
             'readOnly' => $request->user()->cant('update', $entry),
             'inplace' => false,
@@ -88,22 +111,62 @@ class ImageCellController extends FieldController
         $this->authorize('update', $entry);
 
         [$grid, $index, $column] = $this->cell($request, $entry, $address);
+        $altIndex = $this->altIndex($request, $entry, $grid, $address);
 
-        $asset = ImageCell::chosen(app(Editor::class), $request->input(self::HANDLE), $request->user());
+        // With an alt row the card sends two fields, and either may be the
+        // only change. An empty picture then means "leave the picture": the
+        // picker opens empty for a path outside every container, and the alt
+        // text must still be savable there. Without an alt row an empty
+        // picture is what it always was, a refusal.
+        $wantsAlt = $altIndex !== null && $request->exists(self::ALT);
+        $chosen = $request->input(self::HANDLE);
+        $pictureEmpty = $chosen === null || $chosen === '' || $chosen === [];
 
-        if ($asset === null) {
-            return response()->json([
-                'message' => __('statamic-inline-edit::messages.error_image'),
-                'errors' => [self::HANDLE => [__('statamic-inline-edit::messages.error_image')]],
-            ], 422);
+        $writes = [];
+        $replacements = [
+            'id' => $entry->id(),
+            'collection' => $entry->collectionHandle(),
+            'site' => $entry->locale(),
+        ];
+
+        if (! ($wantsAlt && $pictureEmpty)) {
+            $asset = ImageCell::chosen(app(Editor::class), $chosen, $request->user());
+
+            if ($asset === null) {
+                return $this->refuse(self::HANDLE, __('statamic-inline-edit::messages.error_image'));
+            }
+
+            $url = ImageCell::publicUrl($asset);
+
+            // The picture already there, sent back by a card that was saved
+            // for its alt text: nothing to write, so the file keeps its line.
+            if ($url !== ($entry->get($grid)[$index][$column] ?? null)) {
+                $writes[$index] = $url;
+            }
         }
 
+        if ($wantsAlt) {
+            $alt = $request->input(self::ALT);
+
+            if ($alt !== null && ! is_string($alt)) {
+                return $this->refuse(self::ALT, __('statamic-inline-edit::messages.error_invalid'));
+            }
+
+            $alt = trim((string) $alt);
+
+            if ($alt !== (string) ($entry->get($grid)[$altIndex][$column] ?? '')) {
+                $writes[$altIndex] = $alt;
+            }
+        }
+
+        // All values through the column's rules first, then written: a bad
+        // alt text must not leave a new picture behind, or the reverse.
+        $processed = [];
+
         try {
-            $value = Cell::process($entry, $grid, $index, $column, ImageCell::publicUrl($asset), [
-                'id' => $entry->id(),
-                'collection' => $entry->collectionHandle(),
-                'site' => $entry->locale(),
-            ]);
+            foreach ($writes as $row => $value) {
+                $processed[$row] = Cell::process($entry, $grid, $row, $column, $value, $replacements);
+            }
         } catch (ValidationException $e) {
             return response()->json([
                 'message' => __('statamic-inline-edit::messages.error_invalid'),
@@ -111,11 +174,47 @@ class ImageCellController extends FieldController
             ], 422);
         }
 
-        Cell::put($entry, $grid, $index, $column, $value);
+        if ($processed === []) {
+            return response()->json(['saved' => true]);
+        }
+
+        foreach ($processed as $row => $value) {
+            Cell::put($entry, $grid, $row, $column, $value);
+        }
 
         $entry->save();
 
         return response()->json(['saved' => true]);
+    }
+
+    protected function refuse(string $field, string $message): JsonResponse
+    {
+        return response()->json([
+            'message' => $message,
+            'errors' => [$field => [$message]],
+        ], 422);
+    }
+
+    /**
+     * Where the alt row sits, when the signed address named one.
+     *
+     * Only ever read from a request whose signature was already checked by
+     * cell(), so `alt` is the server's own word. Gone or turned into a picture
+     * since is 404, like the picture's own row.
+     */
+    protected function altIndex(Request $request, $entry, string $grid, string $address): ?int
+    {
+        $alt = $request->query('alt');
+
+        if ($alt === null || $alt === '') {
+            return null;
+        }
+
+        $parts = Cell::parse($address);
+
+        abort_unless(is_string($alt) && $parts !== null && ImageCell::altRowFits($entry, $grid, $parts[1], $alt), 404);
+
+        return Cell::rowIndex($entry, $grid, $alt);
     }
 
     /**

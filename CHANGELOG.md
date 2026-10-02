@@ -1,5 +1,48 @@
 # Changelog
 
+## 1.10.0 (unreleased)
+
+### Alt texts on the picture card
+
+An alt text is never on the page, so there was nothing to double-click. It
+now sits where the picture is dealt with anyway: under the asset browser on
+the card that opens on a picture cell, as a text field "Alt text".
+
+    InlineEdit::cell($entry, 'rows', $row['id'], 'value', 'Hero picture', image: true, alt: $altRow['id']);
+
+- The alt row is another row of the same grid, same column. Its id is signed
+  into the card's address together with the picture's, so the field writes
+  that cell and no other; moved onto another row the signature fails (403).
+- The marker leaves the alt out when the row would not fit: missing, the
+  picture's own row, or a row the site calls a picture (`imageCells`). The
+  card then is the picture alone, as before. Gone or turned into a picture
+  between rendering and saving is 404.
+- Saving sends both fields. A picture that is already there is not written
+  again, an alt text that did not change is not written either, so saving
+  only the alt text changes exactly one line of the entry. An empty picture
+  next to an alt text means "leave the picture" (the picker opens empty for a
+  path outside every container). A bad picture writes neither; an alt text
+  that is not a string is 422. Both go through the column's rules first.
+- Why a row and not the asset's own `alt` field: the same photo stands in
+  different places for different reasons, and an asset's meta lives next to
+  the file, not in the entry; on a site whose content is versioned and the
+  uploads are not, it would not travel with the page.
+
+### Cells the page draws differently: `source: true`
+
+A text cell whose page shows its value changed (`*word*` drawn as emphasis, a
+soft hyphen, two cells as one line) could not be edited safely: the save sent
+the drawing and wrote it over the source. With `source: true` the marker
+carries the stored value as `data-sie-source`; while the cell is edited the
+element shows that instead, opening and leaving it unchanged is not a change,
+and Escape or leaving it untouched puts the drawing back.
+
+### Smaller
+
+- `InlineEdit::supports('alt' | 'source')`, for a site that has to run on
+  more than one version of the addon.
+- The one-field card posts every field of its blueprint, not just the first.
+
 ## 1.9.0
 
 ### Pictures

@@ -1879,8 +1879,46 @@
         })();
     });
 
+    /**
+     * A text cell whose page draws its value differently.
+     *
+     * `*Stimme.*` arrives as an emphasised word, a soft hyphen as nothing at
+     * all, two cells as one line. Typed into as it stands, the save would send
+     * the drawing and write it over the source: the emphasis gone for good.
+     * So a marker that carries `data-sie-source` shows the stored value while
+     * it is edited, and the drawing comes back when nothing was changed, on
+     * Escape, and after the save's reload.
+     *
+     * The baseline moves with it: the source as shown is "unchanged", so
+     * opening and closing such a field is not a change.
+     */
+    var showingSource = new WeakMap();
+
+    function showSource(node) {
+        var source = node.getAttribute('data-sie-source');
+
+        if (source === null || showingSource.has(node)) return;
+        // Already typed into and left: what is there is the pending change.
+        if (read(node) !== original.get(node)) return;
+
+        showingSource.set(node, original.get(node));
+        node.textContent = source;
+        original.set(node, read(node));
+    }
+
+    function hideSource(node, force) {
+        if (!showingSource.has(node)) return;
+        if (!force && read(node) !== original.get(node)) return;
+
+        node.innerHTML = originalHtml.get(node);
+        original.set(node, showingSource.get(node));
+        showingSource.delete(node);
+    }
+
     function startEditing(node) {
         if (!editing || node.isContentEditable) return;
+
+        showSource(node);
 
         node.setAttribute('contenteditable', PLAINTEXT ? 'plaintext-only' : 'true');
         node.classList.add('sie-active');
@@ -1898,10 +1936,12 @@
 
         node.removeAttribute('contenteditable');
         node.classList.remove('sie-active');
+        hideSource(node, false);
         node.classList.toggle('sie-empty', isBlank(node));
     }
 
     function revert(node) {
+        hideSource(node, true);
         node.innerHTML = originalHtml.get(node);
         stopEditing(node);
         paint();
@@ -2150,6 +2190,9 @@
 
                 changed.forEach(function (node) {
                     clearPending(node);
+                    // The saved source is now what the field holds; there is
+                    // no older drawing to go back to.
+                    showingSource.delete(node);
                     remember(node);
                     node.classList.toggle('sie-empty', isBlank(node));
                 });

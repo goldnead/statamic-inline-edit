@@ -63,11 +63,35 @@ class InlineEdit
      *
      *     'hero' => InlineEdit::cell($entry, 'rows', $row['id'], 'value', 'Hero picture', image: true),
      *
+     * The alt text of that picture lives in another row of the same grid. Name
+     * that row, and the card that opens on the picture carries a text field
+     * for it under the asset browser. The row id is signed into the card's
+     * address, so the field writes that cell and no other:
+     *
+     *     InlineEdit::cell($entry, 'rows', $row['id'], 'value', 'Hero picture', image: true, alt: $altRow['id']),
+     *
+     * A text cell whose page shows its value changed (`*word*` drawn as
+     * emphasis, a soft hyphen, two cells joined into one line) cannot be
+     * edited as the text on the page: saving what is on the page would write
+     * the drawing back over the source. With `source: true` the marker carries
+     * the stored value, and while the cell is being edited the element shows
+     * that instead. Escape, or leaving it unchanged, puts the page back.
+     *
      * @return array<string, string>
      */
-    public static function cell(mixed $entry, string $grid, string $row, string $column, ?string $label = null, bool $image = false): array
+    public static function cell(mixed $entry, string $grid, string $row, string $column, ?string $label = null, bool $image = false, ?string $alt = null, bool $source = false): array
     {
-        return app(Marker::class)->forCell($entry, $grid, $row, $column, $label, $image);
+        return app(Marker::class)->forCell($entry, $grid, $row, $column, $label, $image, $alt, $source);
+    }
+
+    /**
+     * Whether this version of the addon knows a feature, for a site that has
+     * to run on more than one: `alt` (an alt text on the picture card) and
+     * `source` (a text cell edited as its stored value).
+     */
+    public static function supports(string $feature): bool
+    {
+        return in_array($feature, ['alt', 'source'], true);
     }
 
     /**

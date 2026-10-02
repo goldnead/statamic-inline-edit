@@ -34,6 +34,8 @@ return [
     'badge_inline' => 'Editor',
     'badge_cp' => 'Control panel',
     'badge_image' => 'Picture',
+    'alt' => 'Alt text',
+    'alt_instructions' => 'What the picture shows, for everyone who cannot see it. Leave empty when it is only decoration.',
 
     'error_auth' => 'You are not signed in.',
     'error_forbidden' => 'You may not edit this entry.',

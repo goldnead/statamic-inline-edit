@@ -30,7 +30,7 @@ class ImageCell
      * an afternoon, and the signature is a statement about the page, not a
      * session.
      */
-    public static function url(mixed $entry, string $address, ?string $label = null): ?string
+    public static function url(mixed $entry, string $address, ?string $label = null, ?string $alt = null): ?string
     {
         if (! is_object($entry) || ! method_exists($entry, 'collectionHandle')) {
             return null;
@@ -47,7 +47,30 @@ class ImageCell
             'entry' => $entry->id(),
             'address' => $address,
             'label' => $label,
+            // The row holding this picture's alt text, same grid and column.
+            // Signed like the rest: the card writes it only because the
+            // server named it here.
+            'alt' => $alt,
         ], fn ($v) => $v !== null && $v !== ''), absolute: false);
+    }
+
+    /**
+     * Whether a row can hold the alt text of the picture in `$pictureRow`.
+     *
+     * Its own row of the same grid, found exactly once, not the picture's row
+     * and not a row the site calls a picture. Asked by the marker before it
+     * signs the row in, and by the card again before it writes: the grid can
+     * change between the two.
+     */
+    public static function altRowFits(mixed $entry, string $grid, string $pictureRow, string $altRow): bool
+    {
+        if ($altRow === $pictureRow) {
+            return false;
+        }
+
+        $index = Cell::rowIndex($entry, $grid, $altRow);
+
+        return $index !== null && ! Cell::isImage($entry, $grid, $index);
     }
 
     /**

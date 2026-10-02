@@ -269,6 +269,33 @@ check('and it is no longer counted', (await count.textContent()) === '1 unsaved'
     check('and it does not count', (await count.textContent()) === '1 unsaved', await count.textContent());
 }
 
+// A cell whose page shows `*Stimme.*` as emphasis. Typed into as drawn, the
+// save would send the drawing and lose the asterisks for good.
+{
+    const motto = page.locator('[data-sie-field="zeilen.s1.wert"]');
+    const drawn = await motto.innerHTML();
+
+    await motto.dblclick();
+    check('a cell with its source shows the source while it is edited', (await motto.innerText()) === 'Zuerst die *Stimme.*', await motto.innerText());
+    check('and showing it is not a change', (await count.textContent()) === '1 unsaved', await count.textContent());
+
+    await page.locator('body').click();
+    check('left untouched, the drawing comes back', (await motto.innerHTML()) === drawn, await motto.innerHTML());
+    check('and still nothing counts', (await count.textContent()) === '1 unsaved', await count.textContent());
+
+    await motto.dblclick();
+    await page.keyboard.press('End');
+    await page.keyboard.type('!');
+    await page.locator('body').click();
+    check('typed into, the source stays with the change', (await motto.innerText()) === 'Zuerst die *Stimme.*!', await motto.innerText());
+    check('and it counts', (await count.textContent()) === '2 unsaved', await count.textContent());
+
+    await motto.dblclick();
+    await page.keyboard.press('Escape');
+    check('escape puts the drawing back', (await motto.innerHTML()) === drawn, await motto.innerHTML());
+    check('and the change is gone', (await count.textContent()) === '1 unsaved', await count.textContent());
+}
+
 console.log('\nenter behaves by fieldtype');
 
 await intro.dblclick();

@@ -34,6 +34,8 @@ return [
     'badge_inline' => 'Editor',
     'badge_cp' => 'Control Panel',
     'badge_image' => 'Bild',
+    'alt' => 'Alt-Text',
+    'alt_instructions' => 'Was auf dem Bild zu sehen ist, für alle, die es nicht sehen. Leer lassen, wenn es nur Zierde ist.',
 
     'error_auth' => 'Du bist nicht angemeldet.',
     'error_forbidden' => 'Du darfst diesen Eintrag nicht bearbeiten.',

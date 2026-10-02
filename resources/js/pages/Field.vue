@@ -116,7 +116,11 @@ async function save() {
                 Accept: 'application/json',
                 'X-CSRF-TOKEN': props.csrfToken,
             },
-            body: JSON.stringify({ [props.handle]: values.value[props.handle] ?? null }),
+            // Every field of the card: one, or a picture with its alt text.
+            body: JSON.stringify(Object.fromEntries(
+                (fields.value.length ? fields.value.map((field) => field.handle) : [props.handle])
+                    .map((handle) => [handle, values.value[handle] ?? null]),
+            )),
         });
 
         const body = await response.json().catch(() => ({}));
