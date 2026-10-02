@@ -34,6 +34,7 @@ return [
     'badge_inline' => 'Editor',
     'badge_cp' => 'Control panel',
     'badge_image' => 'Picture',
+    'badge_popup' => 'Window',
     'alt' => 'Alt text',
     'alt_instructions' => 'What the picture shows, for everyone who cannot see it. Leave empty when it is only decoration.',
 

@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<title>popup fixture</title>
+<link rel="stylesheet" href="../../resources/dist/inline-edit.css">
+<style>
+    body { font: 16px/1.5 Georgia, serif; max-width: 760px; margin: 40px auto; padding: 0 16px; }
+</style>
+</head>
+<body>
+
+<!--
+  The markup InlineEdit::popup() emits. A headline drawn from two cells, the
+  second one with `*emphasis*` the page turns into <em>; and a sentence with a
+  link in the middle of it, one cell.
+-->
+
+<h1 data-sie-id="entry-2" data-sie-field="zeilen.h1.wert" data-sie-type="popup" data-sie-mode="popup"
+    data-sie-stamp="1700000001" data-sie-reload="true" data-sie-label="Hero-Überschrift"
+    data-sie-popup='[{"field":"zeilen.h1.wert","label":"Zeile 1","value":"Zuerst die","multiline":false},{"field":"zeilen.h2.wert","label":"Zeile 2","value":"*Stimme.*","multiline":true}]'>Zuerst die <span><em>Stimme.</em></span></h1>
+
+<p data-sie-id="entry-2" data-sie-field="zeilen.l1.wert" data-sie-type="popup" data-sie-mode="popup"
+   data-sie-stamp="1700000001" data-sie-reload="true" data-sie-label="Satz mit Link"
+   data-sie-popup='[{"field":"zeilen.l1.wert","label":"Satz mit Link","value":"Noch etwas offen? Schreib an .","multiline":false}]'>Noch etwas offen? Schreib an <a href="#weggeklickt" id="der-link">info@example.com</a>.</p>
+
+<p>Plain text next to it: <span data-sie-id="entry-2" data-sie-field="zeilen.t1.wert" data-sie-type="text" data-sie-mode="text" data-sie-stamp="1700000001">Bleibt Text</span></p>
+
+<script id="statamic-inline-edit-config" type="application/json">
+{
+  "saveUrl": "https://fixture.test/!/statamic-inline-edit/save",
+  "rich": false,
+  "csrf": "test-csrf-token",
+  "maxLength": 100000,
+  "labels": {
+    "edit": "Edit page",
+    "save": "Save",
+    "saved": "Saved",
+    "discard": "Discard",
+    "unsaved": ":count unsaved",
+    "done": "Done",
+    "badge_popup": "Window"
+  }
+}
+</script>
+<script src="../../resources/dist/inline-edit.js"></script>
+
+</body>
+</html>

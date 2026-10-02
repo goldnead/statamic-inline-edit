@@ -372,6 +372,33 @@ router.on('before', (event) => {
 `InlineEdit::active()` answers whether this request has a marker on it at all, and
 `InlineEdit::assets()` gives the markup for a layout that places the script itself.
 
+### Text the page draws differently: a small window
+
+Some text cannot be typed into where it stands, because the page shows it changed: a headline
+built from two cells, a sentence with a link in the middle, a word the component turns into
+emphasis, a quote it wraps in quotation marks, the same label in six places. Typed into, the
+element would save the drawing over the value. For those, ask for a window:
+
+```php
+'heroMarker' => InlineEdit::popup($entry, [
+    'rows.'.$line1['id'].'.text' => 'Line 1',
+    'rows.'.$line2['id'].'.text' => 'Line 2',
+], 'Hero headline'),
+
+'quoteMarker' => InlineEdit::popup($testimonial, ['quote' => 'Quote', 'author_name' => 'Name']),
+
+// one cell
+'lead' => InlineEdit::cell($entry, 'rows', $row['id'], 'text', 'Lead', popup: true),
+```
+
+A double-click opens a small window over the element with one box per value, holding the value
+as it is stored. Only the boxes that changed are saved, through the same route and the same
+gates as any text, and the page reloads so your component draws them its own way. Addresses
+are field handles or cells (`grid.rowId.column`) of one entry, plain text only; one that is not
+writable as text refuses the whole marker, so the window never shows less than the element
+does. A click on a link inside such an element does not follow it while editing is on.
+`InlineEdit::supports('popup')` tells a site which version it runs on.
+
 ## Not in this version
 
 Named, not hidden:

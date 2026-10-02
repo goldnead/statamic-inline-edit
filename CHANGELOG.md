@@ -1,5 +1,44 @@
 # Changelog
 
+## 1.11.0 (unreleased)
+
+### A small window for text that cannot be typed into in the line
+
+A headline built from two cells, a sentence with a link in it, a word drawn as
+emphasis, a quote wrapped in quotation marks, the same label in six places: the
+page shows these values changed, so typing into the element would save the
+drawing. They now open a window instead.
+
+    InlineEdit::popup($entry, ['rows.a1.text' => 'Line 1', 'rows.a2.text' => 'Line 2'], 'Hero headline');
+    InlineEdit::popup($testimonial, ['quote', 'author_name']);
+    InlineEdit::cell($entry, 'rows', $row['id'], 'text', 'Lead', popup: true);
+
+- New mode `popup` (`data-sie-popup` carries the boxes: address, label, stored
+  value, whether it has lines). One box per value, a one-line input or a
+  textarea as tall as the value; only boxes that changed are sent, each under
+  its own address, through the existing save route and its gates. The page
+  reloads after the save.
+- Addresses are field handles or grid cells of one entry, plain text only, the
+  same gates as a text marker (permission, no revisions, not forbidden, not
+  read-only/hidden/computed, not a picture row). One address failing refuses
+  the whole marker.
+- Pending changes survive closing the window (Escape, Done, a click outside),
+  the window's own Save is the bar's. Ctrl/Cmd+Enter saves from a box.
+- The pending value shows as a small note above the element, not at the size
+  of the headline it sits on.
+- While editing, a click on a link inside a window element is not followed,
+  and a double-click opens the innermost marker only (a button label inside a
+  sentence opens itself, not the sentence's window).
+- `InlineEdit::supports('popup')`.
+
+### The picture card has no "Set Alt"
+
+Core's asset field shows a "Set Alt" badge on the tile, which writes the
+asset's own meta, a place the page never reads. Next to the card's alt text
+field it looked like the same thing. Off on the picture card only
+(`show_set_alt: false`), core's switch; the asset field everywhere else in
+the control panel keeps it.
+
 ## 1.10.0
 
 ### Alt texts on the picture card

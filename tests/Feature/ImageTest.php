@@ -190,6 +190,10 @@ class ImageTest extends TestCase
                 ->where('blueprint.tabs.0.sections.0.fields.0.type', 'assets')
                 ->where('blueprint.tabs.0.sections.0.fields.0.container', 'assets')
                 ->where('blueprint.tabs.0.sections.0.fields.0.max_files', 1)
+                // Core's "Set Alt" on the tile writes the asset's own meta,
+                // not this page. Next to the card's alt text field it reads
+                // as the same thing, and is not, so the card has none.
+                ->where('blueprint.tabs.0.sections.0.fields.0.show_set_alt', false)
                 ->where('values.asset', ['assets::portrait.jpg'])
                 ->where('readOnly', false)
                 ->where('saveUrl', fn ($url) => str_starts_with($url, '/cp/inline-edit/image/pages/entry-1/zeilen.b1.wert?signature='))

@@ -151,6 +151,7 @@
         inline: L.badge_inline || 'Editor',
         cp: L.badge_cp || 'Control Panel',
         image: L.badge_image || 'Bild',
+        popup: L.badge_popup || 'Fenster',
     };
 
     /**
@@ -374,6 +375,7 @@
 
         if (mode === 'control') return openControl(node);
         if (mode === 'source') return openSource(node);
+        if (mode === 'popup') return openFieldsPopup(node);
         if (mode === 'inline') return openInplace(node);
         // A picture is the same card, holding the asset field; the asset
         // browser is core's, behind it.
@@ -604,6 +606,148 @@
 
         placePop(node);
         input.focus();
+    }
+
+    /**
+     * Text the page shows differently from how it is stored, in a window.
+     *
+     * Two cells joined into one headline, a sentence with a link in it, a
+     * word drawn as emphasis, a quote wrapped in quotation marks: typed into
+     * in the line, the element would save its drawing over the value. Here
+     * every value the element shows gets a box of its own, holding what is
+     * stored, and only the boxes that changed are sent.
+     *
+     * The changes are pending like any other until saved, so closing the
+     * window (Escape, Done, a click outside) never loses them. Its own Save
+     * is the bar's: everything pending goes, and the page reloads so the
+     * component draws the new values its own way.
+     */
+    function popupFields(node) {
+        try {
+            var list = JSON.parse(node.dataset.siePopup || '[]');
+
+            return Array.isArray(list) ? list.filter(function (f) { return f && typeof f.field === 'string'; }) : [];
+        } catch (e) {
+            return [];
+        }
+    }
+
+    function openFieldsPopup(node) {
+        var fields = popupFields(node);
+
+        if (!fields.length) return;
+
+        popFor = node;
+        pop.innerHTML = '';
+        pop.className = 'sie-pop sie-pop-fields';
+
+        var head = document.createElement('span');
+        head.className = 'sie-pop-label';
+        head.textContent = node.dataset.sieLabel || (fields.length === 1 ? fields[0].label : '') || node.dataset.sieField;
+        pop.appendChild(head);
+
+        var was = pending.has(node) ? pending.get(node) : {};
+        var boxes = [];
+
+        function changed() {
+            var out = {};
+            var shown = [];
+
+            boxes.forEach(function (box) {
+                if (box.input.value !== box.field.value) out[box.field.field] = box.input.value;
+                shown.push(box.input.value.replace(/\s+/g, ' ').trim());
+            });
+
+            if (Object.keys(out).length) {
+                setPending(node, out, shown.join(' · '));
+            } else {
+                clearPending(node);
+                paint();
+            }
+        }
+
+        fields.forEach(function (field, i) {
+            var wrap = document.createElement('label');
+            wrap.className = 'sie-pop-box';
+
+            // The box's own name only where there is more than one: a window
+            // with one box already says what it is in its heading.
+            if (fields.length > 1) {
+                var name = document.createElement('span');
+                name.className = 'sie-pop-name';
+                name.textContent = field.label || field.field;
+                wrap.appendChild(name);
+            }
+
+            var value = typeof field.value === 'string' ? field.value : '';
+            var long = field.multiline || value.length > 70 || value.indexOf('\n') > -1;
+            var input = document.createElement(long ? 'textarea' : 'input');
+
+            input.className = long ? 'sie-input sie-input-area' : 'sie-input';
+            if (!long) input.type = 'text';
+            input.spellcheck = true;
+            input.value = Object.prototype.hasOwnProperty.call(was, field.field) ? was[field.field] : value;
+            // As tall as the value, from one line: a headline's line in a box
+            // three lines high reads like a paragraph waiting to be written.
+            if (long) input.rows = Math.min(8, Math.max(1, Math.ceil(input.value.length / 55) + (input.value.split('\n').length - 1)));
+
+            input.addEventListener('input', changed);
+            input.addEventListener('keydown', function (event) {
+                if (event.key === 'Escape') {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    closePop();
+
+                    return;
+                }
+
+                // Ctrl/Cmd+Enter saves from anywhere, Enter in a one-line box
+                // closes the window; in a box with lines it is a new line.
+                if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) {
+                    event.preventDefault();
+                    closePop();
+                    save();
+
+                    return;
+                }
+
+                if (event.key === 'Enter' && !long) {
+                    event.preventDefault();
+                    closePop();
+                }
+            });
+
+            wrap.appendChild(input);
+            pop.appendChild(wrap);
+            boxes.push({ field: field, input: input });
+
+            if (i === 0) wrap.dataset.first = 'true';
+        });
+
+        var actions = document.createElement('div');
+        actions.className = 'sie-pop-actions';
+
+        var done = document.createElement('button');
+        done.type = 'button';
+        done.className = 'sie-pop-quiet';
+        done.textContent = L.done || 'Fertig';
+        done.addEventListener('click', closePop);
+
+        var store = document.createElement('button');
+        store.type = 'button';
+        store.className = 'sie-pop-done';
+        store.textContent = L.save || 'Speichern';
+        store.addEventListener('click', function () {
+            closePop();
+            save();
+        });
+
+        actions.appendChild(done);
+        actions.appendChild(store);
+        pop.appendChild(actions);
+
+        placePop(node);
+        boxes[0].input.focus();
     }
 
     /**
@@ -1976,6 +2120,10 @@
         node.addEventListener('dblclick', function (event) {
             if (!editing) return;
             event.preventDefault();
+            // The innermost marker answers. A window around a sentence can
+            // hold a field of its own (a button label), and both opening at
+            // once would leave a cursor under the window.
+            event.stopPropagation();
             open(node);
         });
 
@@ -1984,8 +2132,11 @@
         // lands on another page instead of in the asset browser. While edit
         // mode is on, the click on a picture belongs to the picture.
         node.addEventListener('click', function (event) {
-            if (!editing || node.dataset.sieMode !== 'image') return;
-            if (node.closest('a, button')) event.preventDefault();
+            if (!editing) return;
+            if (node.dataset.sieMode === 'image' && node.closest('a, button')) event.preventDefault();
+            // The same for a sentence opened in a window: the link in the
+            // middle of it is where the double-click is most likely to land.
+            if (node.dataset.sieMode === 'popup' && event.target.closest && event.target.closest('a')) event.preventDefault();
         });
 
         // A double-click is a mouse gesture. On a touch screen a double-tap is
@@ -2000,6 +2151,9 @@
         node.addEventListener('pointerup', function (event) {
             if (!editing || event.pointerType !== 'touch' || node.isContentEditable) return;
             event.preventDefault();
+            // Innermost only, as with the double-click: a picture inside a
+            // headline that opens as a window must not open both.
+            event.stopPropagation();
             open(node);
         });
 
@@ -2136,6 +2290,16 @@
             }
 
             var value = valueOf(node);
+
+            // A window holds several values, each under its own address,
+            // and only the ones that changed.
+            if (node.dataset.sieMode === 'popup') {
+                Object.keys(value || {}).forEach(function (address) {
+                    byEntry[id].fields[address] = String(value[address]).slice(0, config.maxLength || 100000);
+                });
+
+                return;
+            }
 
             // A toggle's value is a real boolean all the way to the blueprint.
             // Cut to length only what has a length: slicing `false` gives "fal".

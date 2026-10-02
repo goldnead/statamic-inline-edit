@@ -77,21 +77,55 @@ class InlineEdit
      * the stored value, and while the cell is being edited the element shows
      * that instead. Escape, or leaving it unchanged, puts the page back.
      *
+     * Where even the stored value in the line is not enough (a sentence with
+     * a link in it, a value the page wraps in quotation marks), `popup: true`
+     * opens it in a small window instead; see popup().
+     *
      * @return array<string, string>
      */
-    public static function cell(mixed $entry, string $grid, string $row, string $column, ?string $label = null, bool $image = false, ?string $alt = null, bool $source = false): array
+    public static function cell(mixed $entry, string $grid, string $row, string $column, ?string $label = null, bool $image = false, ?string $alt = null, bool $source = false, bool $popup = false): array
     {
-        return app(Marker::class)->forCell($entry, $grid, $row, $column, $label, $image, $alt, $source);
+        return app(Marker::class)->forCell($entry, $grid, $row, $column, $label, $image, $alt, $source, $popup);
+    }
+
+    /**
+     * The marker for an element that shows one or more stored values in a
+     * way that cannot be typed into: two cells joined into one headline, a
+     * sentence with a link in it, a quote wrapped in quotation marks.
+     *
+     * A double-click opens a small window with one box per value, holding
+     * the value as it is stored. Saving writes those values and nothing
+     * else, through the same route and the same gates as any text, and the
+     * page reloads so the component draws them again:
+     *
+     *     'heroMarker' => InlineEdit::popup($entry, [
+     *         'rows.'.$line1['id'].'.text' => 'Line 1',
+     *         'rows.'.$line2['id'].'.text' => 'Line 2',
+     *     ], 'Hero headline'),
+     *
+     *     'quoteMarker' => InlineEdit::popup($testimonial, ['quote', 'name']),
+     *
+     * Addresses are field handles or cells (`grid.rowId.column`) of this one
+     * entry, plain text only. One that is not writable as text refuses the
+     * whole marker, so the window never shows less than the element does.
+     *
+     * @param  array<int|string, string>  $fields  addresses, or address => label
+     * @return array<string, string>
+     */
+    public static function popup(mixed $entry, array $fields, ?string $label = null): array
+    {
+        return app(Marker::class)->forPopup($entry, $fields, $label);
     }
 
     /**
      * Whether this version of the addon knows a feature, for a site that has
-     * to run on more than one: `alt` (an alt text on the picture card) and
-     * `source` (a text cell edited as its stored value).
+     * to run on more than one: `alt` (an alt text on the picture card),
+     * `source` (a text cell edited as its stored value) and `popup` (values
+     * edited in a small window, popup() and `cell(..., popup: true)`).
      */
     public static function supports(string $feature): bool
     {
-        return in_array($feature, ['alt', 'source'], true);
+        return in_array($feature, ['alt', 'source', 'popup'], true);
     }
 
     /**

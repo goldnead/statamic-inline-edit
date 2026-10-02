@@ -1416,6 +1416,88 @@ await page.waitForTimeout(300);
 
 check('and on a page with nothing to edit, the bar goes away', await bar.evaluate((el) => el.hidden));
 
+/* ------------------------------------------- values opened in a window ---- */
+
+console.log('\na window for what cannot be typed into in the line');
+
+await page.goto('file://' + resolve(here, 'fixture-popup.html'));
+await page.waitForSelector('.sie-bar', { state: 'attached' });
+if (await page.locator('.sie-launch').isVisible()) {
+    await page.locator('.sie-launch').click();
+}
+
+const headline = page.locator('h1[data-sie-mode="popup"]');
+const sentence = page.locator('p[data-sie-mode="popup"]');
+const popCount = page.locator('.sie-count');
+
+check('it says it opens a window', (await headline.getAttribute('data-sie-badge')) === 'Window', await headline.getAttribute('data-sie-badge'));
+check('and the cursor says click, not type', (await headline.evaluate((el) => getComputedStyle(el).cursor)) === 'pointer');
+
+await page.locator('#der-link').click();
+await page.waitForTimeout(100);
+check('a click on the link inside the sentence does not follow it', !page.url().endsWith('#weggeklickt'), page.url());
+
+await headline.dblclick();
+await page.waitForTimeout(100);
+
+const boxes = page.locator('.sie-pop .sie-input');
+
+check('a double-click opens the window', await page.locator('.sie-pop').isVisible());
+check('the headline itself is not typed into', !(await headline.evaluate((el) => el.isContentEditable)));
+check('one box per value', (await boxes.count()) === 2, String(await boxes.count()));
+check('each holding what is stored, not what is drawn',
+    (await boxes.nth(0).inputValue()) === 'Zuerst die' && (await boxes.nth(1).inputValue()) === '*Stimme.*',
+    JSON.stringify([await boxes.nth(0).inputValue(), await boxes.nth(1).inputValue()]));
+check('with the names of the boxes', JSON.stringify(await page.locator('.sie-pop .sie-pop-name').allTextContents()) === '["Zeile 1","Zeile 2"]');
+check('and the window named after the element', (await page.locator('.sie-pop .sie-pop-label').textContent()) === 'Hero-Überschrift');
+check('the first box has the cursor', await boxes.nth(0).evaluate((el) => document.activeElement === el));
+
+await boxes.nth(1).fill('*Stimme* zuerst.');
+await page.waitForTimeout(50);
+check('a changed box is a change', (await popCount.textContent()) === '1 unsaved', await popCount.textContent());
+check('and the page says what it will become', (await headline.getAttribute('data-sie-ghost')) === 'Zuerst die · *Stimme* zuerst.', await headline.getAttribute('data-sie-ghost'));
+
+await page.keyboard.press('Escape');
+await page.waitForTimeout(50);
+check('Escape closes the window', await page.locator('.sie-pop').isHidden());
+check('and keeps the change', (await popCount.textContent()) === '1 unsaved', await popCount.textContent());
+
+await headline.dblclick();
+check('opened again, it shows the change', (await page.locator('.sie-pop .sie-input').nth(1).inputValue()) === '*Stimme* zuerst.');
+
+await page.locator('.sie-pop .sie-input').nth(1).fill('*Stimme.*');
+await page.waitForTimeout(50);
+check('typed back to what it was, it is no change at all', await page.locator('.sie-save').isDisabled());
+
+await page.locator('.sie-pop .sie-input').nth(1).fill('*Stimme.* Immer.');
+await page.locator('.sie-pop-quiet').click();
+check('Done closes it too', await page.locator('.sie-pop').isHidden());
+
+await sentence.dblclick();
+await page.waitForTimeout(100);
+check('a double-click on the sentence opens it, not the link', !page.url().endsWith('#weggeklickt') && await page.locator('.sie-pop').isVisible(), page.url());
+check('one box, no extra name over it', (await page.locator('.sie-pop .sie-input').count()) === 1 && (await page.locator('.sie-pop .sie-pop-name').count()) === 0);
+
+await page.locator('.sie-pop .sie-input').fill('Noch etwas offen? Schreib mir an .');
+await page.keyboard.press('Enter');
+check('Enter in a one-line box closes the window', await page.locator('.sie-pop').isHidden());
+check('two windows changed', (await popCount.textContent()) === '2 unsaved', await popCount.textContent());
+
+reply = { status: 200, body: { saved: [{ id: 'entry-2', stamp: '1700010001' }] } };
+lastRequest = null;
+
+await headline.dblclick();
+await page.locator('.sie-pop .sie-pop-done').click();
+await page.waitForTimeout(600);
+
+const popSent = lastRequest?.body?.changes?.find((c) => c.id === 'entry-2')?.fields ?? {};
+
+check('Save in the window sends what is pending', lastRequest !== null);
+check('only the boxes that changed, under their own addresses',
+    JSON.stringify(Object.keys(popSent).sort()) === '["zeilen.h2.wert","zeilen.l1.wert"]', JSON.stringify(popSent));
+check('as the stored text, not its drawing',
+    popSent['zeilen.h2.wert'] === '*Stimme.* Immer.' && popSent['zeilen.l1.wert'] === 'Noch etwas offen? Schreib mir an .', JSON.stringify(popSent));
+
 await browser.close();
 server.close();
 

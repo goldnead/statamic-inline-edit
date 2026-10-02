@@ -60,6 +60,12 @@ class ImageCellController extends FieldController
             'max_files' => 1,
             'mode' => 'grid',
             'allow_uploads' => true,
+            // Core's own switch for the "Set Alt" badge on the tile. That
+            // badge writes the alt text into the asset's meta, a place this
+            // page never reads, and next to the card's alt field it looks
+            // like the same thing. Off here only: the asset field everywhere
+            // else in the control panel keeps it.
+            'show_set_alt' => false,
         ]];
 
         $values = [self::HANDLE => $current ? [$current->id()] : []];

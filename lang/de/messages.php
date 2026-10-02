@@ -34,6 +34,7 @@ return [
     'badge_inline' => 'Editor',
     'badge_cp' => 'Control Panel',
     'badge_image' => 'Bild',
+    'badge_popup' => 'Fenster',
     'alt' => 'Alt-Text',
     'alt_instructions' => 'Was auf dem Bild zu sehen ist, für alle, die es nicht sehen. Leer lassen, wenn es nur Zierde ist.',
 

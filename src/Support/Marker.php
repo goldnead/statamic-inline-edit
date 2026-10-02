@@ -75,10 +75,16 @@ class Marker
      *
      * @return array<string, string>
      */
-    public function forCell(mixed $entry, string $grid, string $row, string $column, ?string $label = null, bool $image = false, ?string $alt = null, bool $source = false): array
+    public function forCell(mixed $entry, string $grid, string $row, string $column, ?string $label = null, bool $image = false, ?string $alt = null, bool $source = false, bool $popup = false): array
     {
         if ($image) {
             return $this->forImageCell($entry, $grid, $row, $column, $label, $alt);
+        }
+
+        if ($popup) {
+            $address = Cell::address($grid, $row, $column);
+
+            return $this->forPopup($entry, $label === null ? [$address] : [$address => $label], $label);
         }
 
         $editor = app(Editor::class);
@@ -155,6 +161,145 @@ class Marker
         }
 
         return $attributes;
+    }
+
+    /**
+     * The marker for an element whose text cannot be edited in the line.
+     *
+     * The page shows these values changed: two cells joined into one
+     * headline, a sentence with a link in it, `*word*` drawn as emphasis, a
+     * quote wrapped in quotation marks. Typed into, the element would save
+     * the drawing. So the element opens a small window with one box per
+     * value, holding the stored value as it is, and the save goes through
+     * the same route as any text, field by field and cell by cell.
+     *
+     * `$fields` are addresses: a field handle (`title`) or a cell
+     * (`grid.rowId.column`), as a list, or as a map of address to the label
+     * its box gets. All of them on this one entry, all of them plain text.
+     *
+     * One of them failing a gate refuses the whole marker. The window shows
+     * what the element shows; a window with one line missing would let the
+     * person believe they edited the whole thing.
+     *
+     * @param  array<int|string, string>  $fields
+     * @return array<string, string>
+     */
+    public function forPopup(mixed $entry, array $fields, ?string $label = null): array
+    {
+        $editor = app(Editor::class);
+
+        if ($fields === [] || ! $editor->enabled() || ! $editor->user()) {
+            return [];
+        }
+
+        if (! is_object($entry) || ! method_exists($entry, 'blueprint') || ! $editor->canEdit($entry)) {
+            return [];
+        }
+
+        // The save route refuses entries under revisions.
+        if (method_exists($entry, 'revisionsEnabled') && $entry->revisionsEnabled()) {
+            return [];
+        }
+
+        $boxes = [];
+
+        foreach ($fields as $key => $value) {
+            [$address, $boxLabel] = is_int($key) ? [(string) $value, null] : [(string) $key, $value];
+
+            $box = $this->popupBox($editor, $entry, $address, $boxLabel);
+
+            if ($box === null) {
+                return [];
+            }
+
+            $boxes[] = $box;
+        }
+
+        $editor->markRendered();
+
+        $attributes = [
+            'data-sie-id' => (string) $entry->id(),
+            'data-sie-field' => $boxes[0]['field'],
+            'data-sie-type' => 'popup',
+            'data-sie-mode' => 'popup',
+            'data-sie-stamp' => $this->stamp($entry),
+            // The page draws these values its own way, and only the page can.
+            'data-sie-reload' => 'true',
+            'data-sie-popup' => $this->json($boxes),
+        ];
+
+        $label ??= count($boxes) === 1 ? $boxes[0]['label'] : null;
+
+        if (is_string($label) && $label !== '') {
+            $attributes['data-sie-label'] = $label;
+        }
+
+        return $attributes;
+    }
+
+    /**
+     * One box of a popup, or null when this address is not plain text this
+     * person may write. The same gates the text marker and the save route
+     * apply, so the window never offers what the save would refuse.
+     *
+     * @return array{field: string, label: string, value: string, multiline: bool}|null
+     */
+    protected function popupBox(Editor $editor, mixed $entry, string $address, ?string $label): ?array
+    {
+        if (str_contains($address, '.')) {
+            $parts = Cell::parse($address);
+
+            if ($parts === null) {
+                return null;
+            }
+
+            [$grid, $row, $column] = $parts;
+
+            $field = Cell::column($editor, $entry, $grid, $column);
+            $index = $field ? Cell::rowIndex($entry, $grid, $row) : null;
+
+            if ($field === null || $index === null || Cell::isImage($entry, $grid, $index)) {
+                return null;
+            }
+
+            $stored = $entry->get($grid)[$index][$column] ?? null;
+            $label ??= collect([Cell::grid($entry, $grid)?->display(), $field->display()])
+                ->filter(fn ($part) => is_string($part) && $part !== '')
+                ->implode(' › ');
+        } else {
+            if (in_array($address, SaveController::FORBIDDEN, true)) {
+                return null;
+            }
+
+            $blueprint = $entry->blueprint();
+            $field = $blueprint && $blueprint->hasField($address) ? $blueprint->field($address) : null;
+
+            if ($field === null || $editor->modeFor($field->type()) !== 'text') {
+                return null;
+            }
+
+            if (in_array($field->visibility(), ['read_only', 'hidden', 'computed'], true)) {
+                return null;
+            }
+
+            $stored = method_exists($entry, 'value') ? $entry->value($address) : $entry->get($address);
+            $label ??= (string) ($field->display() ?: $address);
+        }
+
+        // Plain text only. A value that is an array or an object here is not
+        // what this box could show or send back.
+        if ($stored !== null && ! is_scalar($stored)) {
+            return null;
+        }
+
+        $value = $stored === null ? '' : (string) $stored;
+
+        return [
+            'field' => $address,
+            'label' => (string) $label,
+            'value' => $value,
+            'multiline' => $editor->isMultiline((string) $field->type()) || str_contains($value, "\n"),
+        ];
     }
 
     /**
