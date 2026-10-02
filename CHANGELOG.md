@@ -1,6 +1,6 @@
 # Changelog
 
-## 1.11.0 (unreleased)
+## 1.11.0
 
 ### A small window for text that cannot be typed into in the line
 
