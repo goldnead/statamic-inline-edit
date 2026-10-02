@@ -24,10 +24,13 @@ with it. A new mode, `image`, for two kinds of target:
   offered as a picture (the headline beside it) cannot be written through it.
   Same gates as a text cell otherwise: entry policy, revisions, an inherited
   grid in a localization, a duplicated row id, read-only columns.
+  Only an asset the person may view is taken, and a container from the list
+  that does not exist or is private is skipped rather than fatal.
 - **`InlineEdit::imageCells(callable)`** tells the text save route which
-  cells are pictures, so it refuses them. The `image: true` on a marker speaks
-  for one page; the text route is stateless and would otherwise take a
-  foreign URL posted from the console.
+  rows hold pictures, so it refuses every cell of them. The `image: true` on a
+  marker speaks for one page; the text route is stateless and would otherwise
+  take a foreign URL posted from the console. Row-wide, because a test that
+  looks at a neighbouring column could otherwise be undone in two requests.
 
 On the page: a picture is never an "empty field" (no chip over the image),
 gets the badge "Picture" (drawn on a box with a background picture; an

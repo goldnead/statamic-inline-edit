@@ -311,6 +311,38 @@ class ImageTest extends TestCase
     }
 
     #[Test]
+    public function only_a_picture_the_person_may_see_is_taken(): void
+    {
+        $this->anEntryWithPictures();
+        $url = $this->signedAsEditor();
+
+        config(['statamic.editions.pro' => true]);
+        Role::make('redaktion')->permissions(['access cp', 'view pages entries', 'edit pages entries'])->save();
+        $blind = User::make()->id('blind-1')->email('blind@example.com')->assignRole('redaktion')->save();
+
+        $this->actingAs($blind)->patchJson($url, ['asset' => ['assets::chor.jpg']])->assertStatus(422);
+
+        $this->assertSame('/assets/portrait.jpg', Entry::find('entry-1')->get('zeilen')[0]['wert']);
+    }
+
+    #[Test]
+    public function a_container_that_does_not_exist_is_skipped_not_fatal(): void
+    {
+        $entry = $this->anEntryWithPictures();
+        $this->actingAs($this->anEditor());
+
+        config(['statamic-inline-edit.image_containers' => ['vertippt', 'assets']]);
+
+        $this->get($this->imageUrl())
+            ->assertOk()
+            ->assertInertia(fn (AssertableInertia $page) => $page->where('blueprint.tabs.0.sections.0.fields.0.container', 'assets'));
+
+        config(['statamic-inline-edit.image_containers' => ['vertippt', 'privat']]);
+
+        $this->assertSame([], InlineEdit::cell($entry, 'zeilen', 'b1', 'wert', null, true));
+    }
+
+    #[Test]
     public function the_row_must_still_be_one_row(): void
     {
         $this->anEntryWithPictures();
@@ -369,6 +401,15 @@ class ImageTest extends TestCase
         }
 
         $this->assertSame('/assets/portrait.jpg', Entry::find('entry-1')->get('zeilen')[0]['wert']);
+
+        // The two-step way round: rename the neighbour the test decides on,
+        // then write the picture cell as text. The first step is refused,
+        // because no cell of a picture row is text.
+        $this->postJson('/!/statamic-inline-edit/save', ['changes' => [[
+            'id' => 'entry-1',
+            'fields' => ['zeilen.b1.schluessel' => 'hero.titel'],
+        ]]])->assertStatus(422);
+        $this->assertSame('hero.image', Entry::find('entry-1')->get('zeilen')[0]['schluessel']);
 
         // No text marker that could only lead to that refusal; the picture
         // marker still works, and the headline next to it is still text.

@@ -111,7 +111,7 @@ class Marker
 
         // The save route would refuse it as text; the picture marker is the
         // way in.
-        if (Cell::isImage($entry, $grid, $index, $column)) {
+        if (Cell::isImage($entry, $grid, $index)) {
             return [];
         }
 

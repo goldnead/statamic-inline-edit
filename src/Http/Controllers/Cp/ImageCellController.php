@@ -89,7 +89,7 @@ class ImageCellController extends FieldController
 
         [$grid, $index, $column] = $this->cell($request, $entry, $address);
 
-        $asset = ImageCell::chosen(app(Editor::class), $request->input(self::HANDLE));
+        $asset = ImageCell::chosen(app(Editor::class), $request->input(self::HANDLE), $request->user());
 
         if ($asset === null) {
             return response()->json([

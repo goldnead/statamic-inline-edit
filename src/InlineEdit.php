@@ -81,10 +81,13 @@ class InlineEdit
      * provider's boot():
      *
      *     InlineEdit::imageCells(fn (array $row, string $column) =>
-     *         $column === 'value' && str_ends_with($row['key'] ?? '', '.image'));
+     *         $column === 'value' && preg_match('~^/assets/.+\.(jpe?g|png|webp)$~', $row['value'] ?? ''));
      *
-     * The callable gets the stored row, the column, the entry and the grid
-     * handle. Null removes it.
+     * The callable gets the stored row, a column, the entry and the grid
+     * handle, and is asked for every column of the row: when it says yes for
+     * any of them, no cell of that row is written as text. Decide on the
+     * stored picture path itself where you can; a test on a neighbouring
+     * column is only as strong as that column is locked. Null removes it.
      *
      * @param  (callable(array<string, mixed>, string, mixed, string): bool)|null  $test
      */

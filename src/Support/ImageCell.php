@@ -57,7 +57,7 @@ class ImageCell
      * the id on its own). It must exist, sit in an allowed container, and
      * have a public URL. Null for anything else, which the caller refuses.
      */
-    public static function chosen(Editor $editor, mixed $value): ?AssetContract
+    public static function chosen(Editor $editor, mixed $value, ?object $user = null): ?AssetContract
     {
         if (is_array($value)) {
             if (count($value) !== 1 || ! array_is_list($value)) {
@@ -78,6 +78,13 @@ class ImageCell
         }
 
         if (! in_array($asset->containerHandle(), $editor->imageContainers(), true)) {
+            return null;
+        }
+
+        // The person must be allowed to see it in the browser. Otherwise a
+        // direct request could set a picture they were never shown, and the
+        // difference between 200 and 422 would tell them which files exist.
+        if ($user !== null && method_exists($user, 'cant') && $user->cant('view', $asset)) {
             return null;
         }
 

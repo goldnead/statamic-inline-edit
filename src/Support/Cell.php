@@ -74,10 +74,15 @@ class Cell
     }
 
     /**
-     * Whether the site says this cell holds a picture. Never true without a
-     * test registered.
+     * Whether the site says this row holds a picture, in any of its columns.
+     * Never true without a test registered.
+     *
+     * The whole row, not just the cell: the test may decide on a neighbour
+     * (a `key` column ending in `.image`). Were that neighbour writable as
+     * text, one request could rename it and a second write any string into
+     * the picture. So no cell of a picture row goes through the text route.
      */
-    public static function isImage(mixed $entry, string $grid, int $index, string $column): bool
+    public static function isImage(mixed $entry, string $grid, int $index): bool
     {
         if (self::$imageTest === null) {
             return false;
@@ -85,7 +90,17 @@ class Cell
 
         $row = $entry->get($grid)[$index] ?? null;
 
-        return is_array($row) && (bool) (self::$imageTest)($row, $column, $entry, $grid);
+        if (! is_array($row)) {
+            return false;
+        }
+
+        foreach (array_keys($row) as $column) {
+            if (is_string($column) && (self::$imageTest)($row, $column, $entry, $grid)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     public static function address(string $grid, string $row, string $column): string

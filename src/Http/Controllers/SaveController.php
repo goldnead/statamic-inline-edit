@@ -258,9 +258,10 @@ class SaveController extends Controller
                 return $refused;
             }
 
-            // A picture cell, by the site's own test: only its picker writes
-            // it, and only with the URL of an asset. Typed text never.
-            if (Cell::isImage($entry, $grid, $index, $column)) {
+            // A picture row, by the site's own test: only its picker writes
+            // it, and only with the URL of an asset. Typed text never, and
+            // not into a neighbouring cell of the same row either.
+            if (Cell::isImage($entry, $grid, $index)) {
                 return $refused;
             }
 

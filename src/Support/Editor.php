@@ -3,6 +3,7 @@
 namespace Goldnead\StatamicInlineEdit\Support;
 
 use Statamic\Contracts\Entries\Entry as EntryContract;
+use Statamic\Facades\AssetContainer;
 use Statamic\Facades\User;
 
 /**
@@ -167,7 +168,22 @@ class Editor
      */
     public function imageContainers(): array
     {
-        return array_values(array_filter((array) config('statamic-inline-edit.image_containers', []), 'is_string'));
+        // Only containers that exist and serve public URLs. A typo in the
+        // config would otherwise open the picker on a container core cannot
+        // find (a 500), and a private one on a browser whose every choice is
+        // then refused.
+        return array_values(array_filter(
+            (array) config('statamic-inline-edit.image_containers', []),
+            function ($handle): bool {
+                if (! is_string($handle) || $handle === '') {
+                    return false;
+                }
+
+                $container = AssetContainer::find($handle);
+
+                return $container !== null && ! $container->private();
+            }
+        ));
     }
 
     public function isMultiline(?string $type): bool
