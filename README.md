@@ -63,13 +63,24 @@ colours.
 
 ```bash
 composer require goldnead/statamic-inline-edit
-php artisan vendor:publish --tag=statamic-inline-edit-assets --force
 ```
 
-The second line is not optional and `--force` is not optional either. The stylesheet and the
-script are served from `public/vendor/statamic-inline-edit/`, and a stale copy there is an
-editor talking to a newer save route, which fails in a way nobody can reproduce. Put both lines
-in your deploy script.
+That is all on a standard Statamic site. Its `composer.json` runs `php artisan statamic:install`
+after every `composer install` and `composer update`, and that publishes this addon's files with
+`--force`: the stylesheet and the script for the public page, and the control panel bundle.
+
+If your site does not run `statamic:install` from Composer, run the publish yourself, on every
+deploy:
+
+```bash
+php artisan vendor:publish --tag=statamic-inline-edit --force
+```
+
+`--force` is not optional. The files are served from `public/vendor/statamic-inline-edit/`, and a
+stale copy there is an editor talking to a newer save route, which fails in a way nobody can
+reproduce. Without the control panel bundle, every control panel page fails on the missing Vite
+manifest. The older `--tag=statamic-inline-edit-assets` still publishes the front-end files on
+their own.
 
 ## Use
 

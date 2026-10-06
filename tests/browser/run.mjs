@@ -166,6 +166,7 @@ check(
     'the host paragraph is uppercase italic with wide tracking'
 );
 check('the hint is shown', (await count.textContent()).includes('double-click'));
+check('and it names the keyboard way in too', (await count.textContent()).includes('Enter'), await count.textContent());
 
 // Narrow screens drop the hint rather than clip it to "Tap o…". Checked here,
 // with nothing pending, because that is the only state in which it is on
@@ -1497,6 +1498,145 @@ check('only the boxes that changed, under their own addresses',
     JSON.stringify(Object.keys(popSent).sort()) === '["zeilen.h2.wert","zeilen.l1.wert"]', JSON.stringify(popSent));
 check('as the stored text, not its drawing',
     popSent['zeilen.h2.wert'] === '*Stimme.* Immer.' && popSent['zeilen.l1.wert'] === 'Noch etwas offen? Schreib mir an .', JSON.stringify(popSent));
+
+/* ------------------------------------------- the keyboard, end to end ---- */
+
+console.log('\nthe keyboard, end to end');
+
+// A page of its own, so the session storage that keeps edit mode across
+// reloads starts empty and nothing pending from above asks for a confirm.
+{
+    const kp = await context.newPage();
+    await kp.goto(PAGE);
+
+    const where = () => kp.evaluate(() => {
+        const a = document.activeElement;
+
+        if (!a || a === document.body) return 'BODY';
+        if (a.dataset && a.dataset.sieField) return 'field:' + a.dataset.sieField;
+
+        return a.tagName + (a.className ? '.' + String(a.className).split(' ').join('.') : '');
+    });
+
+    // The name a screen reader announces for a control: its labelledby
+    // targets, its <label>, or its aria-label. Nothing else counts.
+    const nameOf = (locator) => locator.evaluate((el) => {
+        const ids = (el.getAttribute('aria-labelledby') || '').split(/\s+/).filter(Boolean);
+        if (ids.length) return ids.map((id) => (document.getElementById(id) || {}).textContent || '').join(' ').trim();
+        if (el.labels && el.labels.length) return Array.from(el.labels).map((l) => l.textContent).join(' ').trim();
+
+        return (el.getAttribute('aria-label') || '').trim();
+    });
+
+    await kp.locator('.sie-launch').focus();
+    await kp.keyboard.press('Enter');
+    check('switched on with Enter, the keyboard lands on a field, not on the page', (await where()).startsWith('field:'), await where());
+
+    // A field under 140px gets no badge, and the badge was all focus showed.
+    await kp.locator('[data-sie-field="promoted"]').focus();
+    await kp.keyboard.press('Tab');
+    const narrowFocus = await kp.locator('[data-sie-field="belegung"]').evaluate((el) => ({
+        width: el.getBoundingClientRect().width,
+        focused: document.activeElement === el,
+        style: getComputedStyle(el).outlineStyle,
+        thick: parseFloat(getComputedStyle(el).outlineWidth),
+    }));
+    check(
+        'a narrow field shows a solid ring when tabbed to',
+        narrowFocus.focused && narrowFocus.width < 140 && narrowFocus.style === 'solid' && narrowFocus.thick >= 2,
+        JSON.stringify(narrowFocus)
+    );
+
+    await kp.keyboard.press('Enter');
+    const pickSelect = kp.locator('.sie-pop select');
+    check('the select is named after its field', (await nameOf(pickSelect)).includes('Belegung'), JSON.stringify(await nameOf(pickSelect)));
+    await kp.keyboard.press('Escape');
+    check('Escape from the select gives focus back to the field', (await where()) === 'field:belegung', await where());
+
+    await kp.locator('[data-sie-field="starts_on"]').focus();
+    await kp.keyboard.press('Enter');
+    check('the date input is named too', (await nameOf(kp.locator('.sie-pop input[type="date"]'))).includes('Beginn'));
+    await kp.keyboard.press('Escape');
+
+    await kp.locator('[data-sie-field="promoted"]').focus();
+    await kp.keyboard.press('Enter');
+    check('and the switch', (await nameOf(kp.locator('.sie-pop .sie-switch'))).includes('Hervorgehoben'));
+    await kp.keyboard.press('Escape');
+
+    await kp.locator('[data-sie-field="hero_title"]').focus();
+    await kp.keyboard.press('Enter');
+    await kp.keyboard.type('weg damit');
+    await kp.keyboard.press('Escape');
+    check('Escape in a text field leaves focus on the field', (await where()) === 'field:hero_title', await where());
+    check('and still closes it', !(await kp.locator('[data-sie-field="hero_title"]').evaluate((el) => el.isContentEditable)));
+
+    await kp.locator('[data-sie-field="title"]').focus();
+    await kp.keyboard.press('Enter');
+    await kp.keyboard.press('Enter');
+    check('Enter in a one-line field leaves focus on the field', (await where()) === 'field:title', await where());
+    check('and closes it', !(await kp.locator('[data-sie-field="title"]').evaluate((el) => el.isContentEditable)));
+
+    await kp.locator('[data-sie-field="body"]').focus();
+    await kp.keyboard.press('Enter');
+    check('the markdown source is named after its field', (await nameOf(kp.locator('.sie-pop textarea'))).includes('Text'));
+    await kp.keyboard.press('Escape');
+    check('closing the markdown editor gives focus back to the field', (await where()) === 'field:body', await where());
+
+    // A long refusal, the way a server phrases one. Cut at 40 characters it
+    // said "Someone else changed this entry after…" and nothing else.
+    await kp.locator('[data-sie-field="hero_title"]').dblclick();
+    await kp.keyboard.press('ControlOrMeta+A');
+    await kp.keyboard.type('Ein Konflikt');
+    await kp.keyboard.press('Enter');
+    reply = { status: 409, body: { message: 'Someone else changed this entry after the page was loaded. Reload the page, then make your change again.' } };
+    await kp.locator('.sie-save').click();
+    await kp.waitForFunction(() => document.querySelector('.sie-status').textContent.includes('Someone'));
+    const statusBox = await kp.locator('.sie-status').evaluate((el) => ({
+        role: el.getAttribute('role'),
+        live: el.getAttribute('aria-live'),
+        clipped: el.scrollWidth > el.clientWidth + 1 || el.scrollHeight > el.clientHeight + 1,
+        ellipsis: getComputedStyle(el).textOverflow === 'ellipsis' && getComputedStyle(el).overflow === 'hidden',
+    }));
+    check('a refused save is announced', ['status', 'alert'].includes(statusBox.role) || !!statusBox.live, JSON.stringify(statusBox));
+    check('and the whole reason is readable', !statusBox.clipped && !statusBox.ellipsis, JSON.stringify(statusBox));
+    if (SHOT) await kp.locator('.sie-bar').screenshot({ path: SHOT.replace(/\.png$/, '') + '-error.png' });
+    await kp.locator('.sie-discard').click();
+
+    await kp.locator('.sie-close').focus();
+    await kp.keyboard.press('Enter');
+    check('switched off, focus goes back to the button that switches it on', (await where()) === 'BUTTON.sie-launch', await where());
+
+    await kp.locator('.sie-launch').focus();
+    await kp.keyboard.press('Enter');
+    await kp.locator('[data-sie-field="hero"]').focus();
+    await kp.keyboard.press('Enter');
+    check('the control panel overlay opens from the keyboard', await kp.locator('.sie-panel').isVisible());
+    await Promise.all([kp.waitForEvent('load', { timeout: 5000 }).catch(() => {}), kp.keyboard.press('Escape')]);
+    await kp.waitForSelector('.sie-bar', { state: 'attached' });
+    await kp.waitForTimeout(100);
+    check('after the overlay closes, focus is back on the field that opened it', (await where()) === 'field:hero', await where());
+
+    await kp.goto('file://' + resolve(here, 'fixture-popup.html'));
+    if (await kp.locator('.sie-launch').isVisible()) await kp.locator('.sie-launch').click();
+    await kp.locator('[data-sie-field="zeilen.l1.wert"]').dblclick();
+    const onlyBox = kp.locator('.sie-pop .sie-input');
+    check('a window with one box names that box', (await onlyBox.count()) === 1 && (await nameOf(onlyBox)) !== '', JSON.stringify(await nameOf(onlyBox)));
+    await kp.keyboard.press('Escape');
+    check('Escape from the window gives focus back to the element', (await where()) === 'field:zeilen.l1.wert', await where());
+
+    await kp.goto(PAGE_RICH);
+    await kp.waitForSelector('.sie-launch', { state: 'attached' });
+    if (await kp.locator('.sie-launch').isVisible()) await kp.locator('.sie-launch').click();
+    await kp.locator('[data-sie-field="body"]').focus();
+    await kp.keyboard.press('Enter');
+    await kp.waitForSelector('.sie-rich', { timeout: 15000 });
+    await kp.waitForTimeout(200);
+    await kp.keyboard.press('Escape');
+    await kp.waitForTimeout(100);
+    check('closing the rich editor with Escape gives focus back to the field', (await where()) === 'field:body', await where());
+
+    await kp.close();
+}
 
 await browser.close();
 server.close();

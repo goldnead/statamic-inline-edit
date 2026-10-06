@@ -247,11 +247,16 @@
     text-overflow: ellipsis;
 }
 
+/* Wraps rather than clips. A refusal cut to "Someone else changed this
+   entry after…" leaves out the part that says what to do about it, and the
+   bar growing a line taller for a moment is the smaller cost. */
 .sie-bar .sie-status {
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    flex: 0 1 auto;
+    min-width: 0;
     max-width: 40ch;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    line-height: 1.35;
 }
 
 .sie-bar .sie-status.sie-ok {
@@ -397,6 +402,17 @@
 .sie-editing [data-sie-field].sie-changed {
     outline: 2px solid #3b82f6;
     background: rgb(59 130 246 / 14%);
+}
+
+/* Keyboard focus, on its own and not through the badge. The badge only
+   appears on fields 140px and wider, so a short value in a row of facts used
+   to take focus without anything on screen changing. Solid and thicker than
+   the dashed "editable" line, so the two never read as the same thing, and
+   the blue holds above 3:1 on white and on black alike. A field being typed
+   into already says so with its own solid outline. */
+.sie-editing [data-sie-field]:focus-visible:not(.sie-active) {
+    outline: 3px solid #3b82f6;
+    outline-offset: 3px;
 }
 
 /* Text is typed into; everything else is a trigger for something that opens

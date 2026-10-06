@@ -9,7 +9,7 @@ return [
     'saved' => 'Saved',
     'discard' => 'Discard',
     'unsaved' => ':count unsaved',
-    'hint' => 'Tap or double-click any highlighted text.',
+    'hint' => 'Tap, double-click or press Enter on any highlighted text.',
     'empty' => 'Empty',
     'empty_field' => 'Add :field',
     'conflict' => 'Someone else changed this page. Reload before saving.',

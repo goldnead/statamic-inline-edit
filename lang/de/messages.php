@@ -9,7 +9,7 @@ return [
     'saved' => 'Gespeichert',
     'discard' => 'Verwerfen',
     'unsaved' => ':count ungespeichert',
-    'hint' => 'Hervorgehobenen Text antippen oder doppelklicken.',
+    'hint' => 'Hervorgehobenen Text antippen, doppelklicken oder mit Enter öffnen.',
     'empty' => 'Leer',
     'empty_field' => ':field ergänzen',
     'conflict' => 'Jemand anders hat die Seite geändert. Bitte neu laden.',

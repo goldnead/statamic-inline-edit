@@ -63,6 +63,7 @@
     })();
 
     var STORAGE_KEY = 'statamic-inline-edit:on';
+    var REFOCUS_KEY = 'statamic-inline-edit:refocus';
     var original = new WeakMap();
     // The markup as well as the text, for Escape. Writing the remembered text
     // back flattened whatever the template had put around it (a <br>, a
@@ -212,7 +213,7 @@
     bar.innerHTML =
         '<span class="sie-brand"></span>' +
         '<span class="sie-count"></span>' +
-        '<span class="sie-status"></span>' +
+        '<span class="sie-status" role="status" aria-live="polite"></span>' +
         '<button type="button" class="sie-btn sie-discard"></button>' +
         '<button type="button" class="sie-btn sie-primary sie-save"></button>' +
         '<button type="button" class="sie-btn sie-close" aria-label=""></button>';
@@ -391,6 +392,14 @@
     pop.hidden = true;
     var popFor = null;
 
+    var popLabels = 0;
+
+    function popLabelId() {
+        popLabels++;
+
+        return 'sie-pop-label-' + popLabels;
+    }
+
     function closePop() {
         var was = popFor;
 
@@ -491,6 +500,7 @@
         // out what they just opened.
         var label = document.createElement('span');
         label.className = 'sie-pop-label';
+        label.id = popLabelId();
         // The separator only when there is something on the other side of it.
         // A field with no kind badge used to read "BELEGUNG ·", which looks
         // like the sentence was cut off.
@@ -602,6 +612,10 @@
             });
         }
 
+        // The heading is what the control is about. Without the link a
+        // screen reader announces "combo box, Offen" and never says which
+        // field it belongs to.
+        input.setAttribute('aria-labelledby', label.id);
         pop.appendChild(input);
 
         placePop(node);
@@ -717,6 +731,13 @@
                 }
             });
 
+            // One box: the window's heading is its name. Several: the
+            // <label> around each, with its own name in it, already is.
+            if (fields.length === 1) {
+                head.id = head.id || popLabelId();
+                input.setAttribute('aria-labelledby', head.id);
+            }
+
             wrap.appendChild(input);
             pop.appendChild(wrap);
             boxes.push({ field: field, input: input });
@@ -831,6 +852,11 @@
 
         if (!instance) return;
 
+        // The editor is a child of the marker, and destroying it takes the
+        // focused element out of the document: the keyboard would land on
+        // <body>. Handed back to the marker, which is where it came from.
+        var hadFocus = node.contains(document.activeElement);
+
         instance.destroy();
         richHosts.delete(node);
         node.classList.remove('sie-rich-host');
@@ -840,6 +866,8 @@
         } else if (richHtml.has(node)) {
             node.innerHTML = richHtml.get(node);
         }
+
+        if (hadFocus && editing) node.focus({ preventScroll: true });
     }
 
     function closeAllRich() {
@@ -906,6 +934,8 @@
             if (event.key === 'Escape') { event.preventDefault(); closePop(); }
         });
 
+        head.id = popLabelId();
+        area.setAttribute('aria-labelledby', head.id);
         pop.appendChild(area);
 
         var done = document.createElement('button');
@@ -1158,6 +1188,7 @@
 
         if (inplace.parentNode) inplace.parentNode.removeChild(inplace);
 
+        refocusAfterReload(inplaceFor);
         inplaceFor = null;
         inplaceGeom = null;
         paint();
@@ -1839,6 +1870,7 @@
         '</div>' +
         '<iframe class="sie-frame" title=""></iframe>';
 
+    var panelFor = null;
     var panelTitle = panel.querySelector('.sie-panel-title');
     var panelClose = panel.querySelector('.sie-panel-close');
     var frame = panel.querySelector('.sie-frame');
@@ -1867,6 +1899,7 @@
 
         if (dirty().length && !window.confirm(L.leave_panel || L.leave || '')) return;
 
+        panelFor = node;
         panelTitle.textContent = node.dataset.sieLabel || node.dataset.sieField;
         frame.title = panelTitle.textContent;
         frame.dataset.sieField = node.dataset.sieField || '';
@@ -1898,7 +1931,44 @@
         // Whatever happened in there happened to the entry, not to this page.
         // Reloading is the only honest way to show it, and it is also the only
         // way to find out that nothing happened.
+        refocusAfterReload(panelFor);
+        panelFor = null;
         window.location.reload();
+    }
+
+    /**
+     * The reload after a panel takes the keyboard back to the top of the
+     * document, a screen or ten away from the field that opened it. The field
+     * is written down here and focused again once the page is back.
+     */
+    function refocusAfterReload(node) {
+        if (!node) return;
+
+        try {
+            sessionStorage.setItem(REFOCUS_KEY, JSON.stringify({ id: node.dataset.sieId, field: node.dataset.sieField }));
+        } catch (e) {
+            // Blocked storage: the page comes back with focus at the top,
+            // as it did before this existed.
+        }
+    }
+
+    function refocusFromReload() {
+        var wanted = null;
+
+        try {
+            wanted = JSON.parse(sessionStorage.getItem(REFOCUS_KEY) || 'null');
+            sessionStorage.removeItem(REFOCUS_KEY);
+        } catch (e) {
+            return;
+        }
+
+        if (!wanted || !editing) return;
+
+        var node = nodes.filter(function (n) {
+            return n.dataset.sieId === wanted.id && n.dataset.sieField === wanted.field;
+        })[0];
+
+        if (node) node.focus();
     }
 
     /**
@@ -2177,16 +2247,22 @@
                 return;
             }
 
+            // Closed in place rather than by blurring. A blur sent the keyboard
+            // to the top of the document, and the next Tab started over from
+            // the first link on the page. The marker keeps its tabindex, so
+            // focus stays on it and Enter opens it again.
             if (event.key === 'Escape') {
                 event.preventDefault();
                 revert(node);
-                node.blur();
+                window.getSelection().removeAllRanges();
                 return;
             }
 
             if (event.key === 'Enter' && node.dataset.sieMultiline !== 'true') {
                 event.preventDefault();
-                node.blur();
+                stopEditing(node);
+                window.getSelection().removeAllRanges();
+                paint();
             }
         });
 
@@ -2409,7 +2485,32 @@
     function toggleMode() {
         if (editing && dirty().length && !window.confirm(L.leave || 'You have unsaved changes on this page.')) return;
         if (editing) discard();
+
+        // The button that was pressed is hidden by the press, and a hidden
+        // element cannot hold focus: the keyboard used to fall back to the
+        // top of the page. On the way in it goes to the first field the
+        // person can see, on the way out back to the button that switches
+        // it on again.
+        var hadFocus = launcher.contains(document.activeElement) || bar.contains(document.activeElement) ||
+            nodes.indexOf(document.activeElement) > -1;
+
         setEditing(!editing);
+
+        if (!hadFocus) return;
+
+        if (editing) {
+            var first = nodes.filter(inView)[0] || nodes[0];
+
+            if (first) first.focus({ preventScroll: inView(first) });
+        } else {
+            launcher.focus();
+        }
+    }
+
+    function inView(node) {
+        var box = node.getBoundingClientRect();
+
+        return box.width > 0 && box.bottom > 0 && box.top < window.innerHeight;
     }
 
     launcher.addEventListener('click', toggleMode);
@@ -2526,6 +2627,7 @@
     rescan();
 
     setEditing(wasEditing);
+    refocusFromReload();
 
     /**
      * And the markers it gets later.

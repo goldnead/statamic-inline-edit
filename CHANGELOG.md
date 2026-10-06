@@ -1,5 +1,36 @@
 # Changelog
 
+## 1.11.1 (2026-10-06)
+
+### Fixed
+
+- Keyboard focus on a field is visible on every field: a solid ring, offset
+  from the dashed "editable" outline. It used to show only through the kind
+  badge, which fields narrower than 140px never get.
+- Focus no longer drops to the top of the page. Escape or Enter in a text
+  field leaves it on the field; closing the rich editor with Escape gives it
+  back to the field; after the control panel overlay or a field opened in
+  place closes and the page reloads, the field that opened it is focused
+  again. Switching edit mode on from the keyboard moves focus to the first
+  visible field, switching it off moves it to the button that switches it on.
+- The select, date input and switch in the small panel, the markdown source
+  box and the one box of a single-value window are named after their field
+  (`aria-labelledby`), so a screen reader says which field it is.
+- A save error is shown in full, wrapped onto a second line rather than cut at
+  40 characters, and the status message is a live region (`role="status"`), so
+  "Saved" and every refusal are announced.
+
+### Changed
+
+- `composer require` is the whole install on a standard Statamic site. The
+  front-end files are now also published under the addon's own tag
+  (`statamic-inline-edit`), which Statamic publishes with `--force` after
+  `statamic:install`. A site that does not run that from Composer needs one
+  command, `php artisan vendor:publish --tag=statamic-inline-edit --force`.
+  The `statamic-inline-edit-assets` tag still works.
+- The bar's hint says that Enter opens a field, too.
+- `MARKETPLACE.md` is no longer part of the Composer package.
+
 ## 1.11.0
 
 ### A small window for text that cannot be typed into in the line

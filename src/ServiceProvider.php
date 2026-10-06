@@ -36,10 +36,12 @@ class ServiceProvider extends AddonServiceProvider
      * only shape its own type allows. That fixes the build directory at
      * `public/build`, so vite.config.js writes there.
      *
-     * Publish it, or the control panel cannot find the manifest and every CP
-     * page dies on it: `php artisan vendor:publish --tag=statamic-inline-edit`.
-     * That is the addon slug, which core registers for this bundle, and a
-     * different tag from `statamic-inline-edit-assets` below.
+     * Published under the addon slug, which core registers for this bundle.
+     * Because the property is set, core also runs `vendor:publish
+     * --tag=statamic-inline-edit --force` after `statamic:install`, which a
+     * standard Statamic site runs after every `composer install` and
+     * `composer update`. Without it the control panel cannot find the
+     * manifest and every CP page dies on it.
      *
      * @var list<string>
      */
@@ -87,13 +89,20 @@ class ServiceProvider extends AddonServiceProvider
             __DIR__.'/../config/statamic-inline-edit.php' => config_path('statamic-inline-edit.php'),
         ], 'statamic-inline-edit-config');
 
-        // The stylesheet and the script the browser actually loads. Marked as
-        // a force target in the install instructions: a stale copy here is an
-        // editor that talks to the previous release of the save route, which
-        // fails in a way nobody can reproduce from the repository.
-        $this->publishes([
-            __DIR__.'/../resources/dist' => public_path('vendor/statamic-inline-edit'),
-        ], 'statamic-inline-edit-assets');
+        // The stylesheet and the script the browser actually loads. A stale
+        // copy here is an editor that talks to the previous release of the
+        // save route, which fails in a way nobody can reproduce from the
+        // repository.
+        //
+        // Under the addon slug as well, so the publish core runs after
+        // `statamic:install` (see $vite) refreshes them with the control panel
+        // bundle, on every composer install and update, with nobody having to
+        // remember a second command. The `-assets` tag stays for the deploy
+        // scripts that already name it.
+        $assets = [__DIR__.'/../resources/dist' => public_path('vendor/statamic-inline-edit')];
+
+        $this->publishes($assets, 'statamic-inline-edit');
+        $this->publishes($assets, 'statamic-inline-edit-assets');
 
         $this->publishes([
             __DIR__.'/../lang' => lang_path('vendor/statamic-inline-edit'),
