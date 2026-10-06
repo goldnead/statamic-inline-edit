@@ -281,6 +281,22 @@
         font-size: 12px;
     }
 
+    /* A message gets a row of its own above the buttons: squeezed next to
+       them, a refusal ran down eight lines of a column a few words wide. */
+    .sie-bar {
+        flex-wrap: wrap;
+    }
+
+    .sie-bar .sie-status {
+        order: -1;
+        flex: 1 1 100%;
+        max-width: none;
+    }
+
+    .sie-bar .sie-status:empty {
+        display: none;
+    }
+
     /* On a phone there is no room for both the hint and the buttons, and a
        hint clipped to "Tap o…" is worse than none. The count stays, because a
        number still fits and it is the one thing that must not be missed.

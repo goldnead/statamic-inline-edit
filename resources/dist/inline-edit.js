@@ -1945,7 +1945,9 @@
         if (!node) return;
 
         try {
-            sessionStorage.setItem(REFOCUS_KEY, JSON.stringify({ id: node.dataset.sieId, field: node.dataset.sieField }));
+            // The page is written down too: a reload that ends somewhere else
+            // (login, redirect) must not move focus on the next page later.
+            sessionStorage.setItem(REFOCUS_KEY, JSON.stringify({ page: location.pathname, id: node.dataset.sieId, field: node.dataset.sieField }));
         } catch (e) {
             // Blocked storage: the page comes back with focus at the top,
             // as it did before this existed.
@@ -1962,7 +1964,7 @@
             return;
         }
 
-        if (!wanted || !editing) return;
+        if (!wanted || !editing || wanted.page !== location.pathname) return;
 
         var node = nodes.filter(function (n) {
             return n.dataset.sieId === wanted.id && n.dataset.sieField === wanted.field;

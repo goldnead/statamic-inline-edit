@@ -1,6 +1,6 @@
 # Changelog
 
-## 1.11.1 (2026-10-06)
+## 1.11.1
 
 ### Fixed
 
@@ -27,7 +27,11 @@
   (`statamic-inline-edit`), which Statamic publishes with `--force` after
   `statamic:install`. A site that does not run that from Composer needs one
   command, `php artisan vendor:publish --tag=statamic-inline-edit --force`.
-  The `statamic-inline-edit-assets` tag still works.
+  The `statamic-inline-edit-assets` tag still works. Because of `--force`,
+  hand edits to the published files in `public/vendor/statamic-inline-edit/`
+  are now replaced on every `composer install` and `composer update`; style
+  the editor from your own stylesheet instead.
+- On a phone, a save message gets its own row above the buttons.
 - The bar's hint says that Enter opens a field, too.
 - `MARKETPLACE.md` is no longer part of the Composer package.
 
