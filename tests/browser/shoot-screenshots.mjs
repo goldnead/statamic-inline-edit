@@ -81,25 +81,36 @@ await page.locator('.sie-launch').click();
 await page.waitForTimeout(400);
 await shoot(page, '01-editing-on');
 
+/** Scroll a field to the middle of the viewport, clear of the bar below. */
+async function middle(page, selector) {
+    await page.locator(selector).first().evaluate((el) => el.scrollIntoView({ block: 'center' }));
+    await page.waitForTimeout(300);
+}
+
+// Example 2: markdown in a rich editor. A selected word brings up the toolbar.
+await middle(page, '[data-sie-field="body"]');
 await page.locator('[data-sie-field="body"]').first().dblclick();
 await page.waitForSelector('.sie-rich', { timeout: 20000 });
 await page.waitForTimeout(700);
-await page.locator('.sie-rich p').first().dblclick({ position: { x: 30, y: 10 } });
+await page.locator('.sie-rich p').first().dblclick({ position: { x: 120, y: 10 } });
 await page.waitForTimeout(500);
 await shoot(page, '02-inline-editor');
 await page.keyboard.press('Escape');
 await page.waitForTimeout(300);
 
-await page.locator('[data-sie-field="belegung"]').first().dblclick();
+// Example 3: a small control (the dropdown) opens next to the word.
+await middle(page, '[data-sie-field="availability"]');
+await page.locator('[data-sie-field="availability"]').first().dblclick();
 await page.waitForTimeout(500);
 await shoot(page, '03-control');
 await page.keyboard.press('Escape');
 await page.waitForTimeout(400);
 
-// A Bard, which is the field the one-field panel was built for. The frame
-// holds that field and nothing else, so there is no licence dialog to chase
-// here any more: the page inside has no control panel shell to put one in.
-await page.locator('[data-sie-field="inhalt"]').first().dblclick();
+// Example 10: everything the page cannot edit itself opens as one control
+// panel field in an overlay. The tags are a field of that kind. (The article
+// of example 9 is a Bard edited in the page, so it never opens this frame.)
+await middle(page, '[data-sie-field="tags"]');
+await page.locator('[data-sie-field="tags"]').first().dblclick();
 
 const frame = page.frameLocator('.sie-frame');
 
@@ -148,13 +159,20 @@ await small.waitForTimeout(600);
 
 // A single tap opens on a touchscreen; a double-click is a mouse gesture and
 // on a phone it is zoom.
+// Scrolled so the editor and its toolbar sit well clear of the bar.
+await small
+    .locator('[data-sie-field="body"]')
+    .first()
+    .evaluate((el) => el.scrollIntoView({ block: 'start' }));
+await small.evaluate(() => window.scrollBy(0, -200));
+await small.waitForTimeout(300);
 await small
     .locator('[data-sie-field="body"]')
     .first()
     .dispatchEvent('pointerup', { pointerType: 'touch', bubbles: true });
 await small.waitForSelector('.sie-rich', { timeout: 20000 });
 await small.waitForTimeout(700);
-await small.locator('.sie-rich p').first().dblclick({ position: { x: 24, y: 10 } });
+await small.locator('.sie-rich p').first().dblclick({ position: { x: 90, y: 10 } });
 await small.waitForTimeout(600);
 await shoot(small, '05-phone');
 
