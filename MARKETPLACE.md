@@ -1,5 +1,26 @@
 # Statamic Inline Edit — Marketplace
 
+## Listing (what goes into the form)
+
+| Field | Value |
+|---|---|
+| Package | `goldnead/statamic-inline-edit` |
+| Name | Inline Edit |
+| Short description (~65 chars, the card shows three lines) | Edit text right on the live page. Double-click, type, save. |
+| Long description | `README.md` (the Marketplace renders it; `statamic:hide` blocks are left out) |
+| Price | $49, one edition (see below) |
+| Tags | inline editing, frontend editing, editor |
+| Demo | https://demo.adriangoldner.dev/inline-edit |
+| Documentation | https://docs.adriangoldner.dev/inline-edit |
+| Support | https://github.com/goldnead/statamic-inline-edit/issues |
+| Cover | `art/marketplace/01-cover.png` (1280×800) |
+| Thumbnail | `art/marketplace/thumbnail.png` (600×600) |
+| Icon | `art/icon.png` |
+| Screenshots | `screenshots/01-editing-on.png` … `05-phone.png` (must show the submitted release) |
+
+Before submitting: run Statamic's review skill on the tag and check the demo serves that tag
+(studio standard `marketplace-readiness.md` §13).
+
 ## Price
 
 **$49, one edition.** Decided by Adrian on 2026-09-19.
