@@ -21,6 +21,11 @@ use Statamic\Facades\Entry;
  * page still matches. Every test starts from such an entry and proves the
  * same thing three times over: the first save moves the stamp, the second,
  * from the older page, is refused, and the first change survives.
+ *
+ * The stamp is never part of an address. The page keeps one, `data-sie-stamp`
+ * on the marker, refreshes it after every save, and the script appends it to
+ * the overlay's address when it opens (`opened()` below does the same). An
+ * address with a stamp baked in would go stale the moment its own page saved.
  */
 class ConcurrentEditTest extends TestCase
 {
@@ -36,6 +41,53 @@ class ConcurrentEditTest extends TestCase
         $this->actingAs($this->anEditor());
 
         return $entry;
+    }
+
+    /**
+     * What the script does when it opens an overlay: the marker's address
+     * plus the stamp the page holds right now.
+     */
+    protected function opened(string $url, string $stamp): string
+    {
+        return $url.(str_contains($url, '?') ? '&' : '?').'stamp='.$stamp;
+    }
+
+    protected function openedStamp(string $url): string
+    {
+        $stamp = null;
+
+        $this->get($url)->assertOk()->assertInertia(function (AssertableInertia $page) use (&$stamp) {
+            $stamp = $page->toArray()['props']['stamp'] ?? null;
+        });
+
+        return (string) $stamp;
+    }
+
+    protected function fieldUrl(\Statamic\Contracts\Entries\Entry $entry, string $handle): string
+    {
+        return app(Marker::class)->fieldUrl($entry, $handle);
+    }
+
+    protected function imageEntry(): \Statamic\Contracts\Entries\Entry
+    {
+        Storage::fake('bilder', ['url' => '/assets']);
+        AssetContainer::make('assets')->disk('bilder')->title('Bilder')->save();
+
+        foreach (['portrait.jpg', 'chor.jpg'] as $file) {
+            Storage::disk('bilder')->put($file, UploadedFile::fake()->image($file, 40, 30)->getContent());
+        }
+
+        return $this->cpSavedEntry(['zeilen' => [
+            ['id' => 'b1', 'schluessel' => 'hero.image', 'wert' => '/assets/portrait.jpg'],
+        ]]);
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    protected function imageMarker(\Statamic\Contracts\Entries\Entry $entry): array
+    {
+        return InlineEdit::cell($entry, 'zeilen', 'b1', 'wert', 'Bild', true);
     }
 
     #[Test]
@@ -72,17 +124,15 @@ class ConcurrentEditTest extends TestCase
     {
         $entry = $this->cpSavedEntry();
 
-        $urlA = app(Marker::class)->fieldUrl($entry, 'intro');
-        $urlB = app(Marker::class)->fieldUrl($entry, 'intro');
+        $stampA = InlineEdit::marker($entry, 'intro')['data-sie-stamp'];
+        $stampB = InlineEdit::marker($entry, 'intro')['data-sie-stamp'];
+        $url = $this->fieldUrl($entry, 'intro');
 
-        $stampA = $this->stampOf($urlA);
-        $stampB = $this->stampOf($urlB);
-
-        $this->patchJson($urlA, ['intro' => 'From A', '_stamp' => $stampA])->assertOk();
+        $this->patchJson($this->opened($url, $stampA), ['intro' => 'From A', '_stamp' => $stampA])->assertOk();
 
         $this->assertNotSame($stampA, (string) Entry::find('entry-1')->lastModified()->getTimestamp());
 
-        $this->patchJson($urlB, ['intro' => 'From B', '_stamp' => $stampB])->assertStatus(409);
+        $this->patchJson($this->opened($url, $stampB), ['intro' => 'From B', '_stamp' => $stampB])->assertStatus(409);
 
         $this->assertSame('From A', Entry::find('entry-1')->get('intro'));
     }
@@ -92,57 +142,80 @@ class ConcurrentEditTest extends TestCase
     {
         $entry = $this->cpSavedEntry();
 
-        $url = app(Marker::class)->fieldUrl($entry, 'intro');
-        $stamp = $this->stampOf($url);
+        $stamp = InlineEdit::marker($entry, 'intro')['data-sie-stamp'];
 
-        $this->get($url)->assertOk()->assertInertia(fn (AssertableInertia $page) => $page->where('stamp', $stamp));
+        $this->assertSame($stamp, $this->openedStamp($this->opened($this->fieldUrl($entry, 'intro'), $stamp)));
+    }
+
+    #[Test]
+    public function an_address_carries_no_stamp_because_the_page_refreshes_its_own(): void
+    {
+        $entry = $this->imageEntry();
+
+        $this->assertStringNotContainsString('stamp=', $this->fieldUrl($entry, 'intro'));
+        $this->assertStringNotContainsString('stamp=', $this->imageMarker($entry)['data-sie-field-url']);
+        $this->assertNotSame('', $this->imageMarker($entry)['data-sie-stamp']);
+    }
+
+    #[Test]
+    public function an_own_direct_save_does_not_make_the_same_pages_overlay_conflict(): void
+    {
+        $entry = $this->cpSavedEntry();
+
+        $stamp = InlineEdit::marker($entry, 'title')['data-sie-stamp'];
+        $url = $this->fieldUrl($entry, 'intro');
+
+        $saved = $this->postJson('/!/statamic-inline-edit/save', ['changes' => [
+            ['id' => 'entry-1', 'stamp' => $stamp, 'fields' => ['title' => 'Mine']],
+        ]])->assertOk()->json('saved.0.stamp');
+
+        // The script wrote the answer onto every marker; the overlay opens
+        // with it, from the very same address as before the save.
+        $this->assertSame($saved, $this->openedStamp($this->opened($url, $saved)));
+
+        $this->patchJson($this->opened($url, $saved), ['intro' => 'Also mine', '_stamp' => $saved])->assertOk();
+
+        $this->assertSame('Also mine', Entry::find('entry-1')->get('intro'));
+    }
+
+    #[Test]
+    public function an_own_direct_save_does_not_make_the_same_pages_image_cell_conflict(): void
+    {
+        $entry = $this->imageEntry();
+
+        $stamp = $this->imageMarker($entry)['data-sie-stamp'];
+        $url = $this->imageMarker($entry)['data-sie-field-url'];
+
+        $saved = $this->postJson('/!/statamic-inline-edit/save', ['changes' => [
+            ['id' => 'entry-1', 'stamp' => $stamp, 'fields' => ['title' => 'Mine']],
+        ]])->assertOk()->json('saved.0.stamp');
+
+        // The signed address is the one the page was drawn with; only the
+        // stamp beside it is new, and it sits outside the signature.
+        $this->assertSame($saved, $this->openedStamp($this->opened($url, $saved)));
+
+        $this->patchJson($this->opened($url, $saved), ['asset' => ['assets::chor.jpg'], '_stamp' => $saved])->assertOk();
+
+        $this->assertSame('/assets/chor.jpg', Entry::find('entry-1')->get('zeilen')[0]['wert']);
     }
 
     #[Test]
     public function an_image_cell_save_moves_the_stamp_and_refuses_the_older_page(): void
     {
-        Storage::fake('bilder', ['url' => '/assets']);
-        AssetContainer::make('assets')->disk('bilder')->title('Bilder')->save();
+        $entry = $this->imageEntry();
 
-        foreach (['portrait.jpg', 'chor.jpg'] as $file) {
-            Storage::disk('bilder')->put($file, UploadedFile::fake()->image($file, 40, 30)->getContent());
-        }
+        $url = $this->imageMarker($entry)['data-sie-field-url'];
+        $stampA = $this->imageMarker($entry)['data-sie-stamp'];
+        $stampB = $this->imageMarker($entry)['data-sie-stamp'];
 
-        $entry = $this->cpSavedEntry(['zeilen' => [
-            ['id' => 'b1', 'schluessel' => 'hero.image', 'wert' => '/assets/portrait.jpg'],
-        ]]);
+        $this->assertSame($stampA, $this->openedStamp($this->opened($url, $stampA)));
 
-        $urlA = InlineEdit::cell($entry, 'zeilen', 'b1', 'wert', 'Bild', true)['data-sie-field-url'];
-        $urlB = InlineEdit::cell($entry, 'zeilen', 'b1', 'wert', 'Bild', true)['data-sie-field-url'];
-
-        $stampA = $this->openedStamp($urlA);
-        $stampB = $this->openedStamp($urlB);
-        $this->assertNotEmpty($stampA);
-
-        $this->patchJson($urlA, ['asset' => ['assets::chor.jpg'], '_stamp' => $stampA])->assertOk();
+        $this->patchJson($this->opened($url, $stampA), ['asset' => ['assets::chor.jpg'], '_stamp' => $stampA])->assertOk();
 
         $this->assertNotSame($stampA, (string) Entry::find('entry-1')->lastModified()->getTimestamp());
 
-        $this->patchJson($urlB, ['asset' => ['assets::portrait.jpg'], '_stamp' => $stampB])->assertStatus(409);
+        $this->patchJson($this->opened($url, $stampB), ['asset' => ['assets::portrait.jpg'], '_stamp' => $stampB])->assertStatus(409);
 
         $this->assertSame('/assets/chor.jpg', Entry::find('entry-1')->get('zeilen')[0]['wert']);
-    }
-
-    protected function openedStamp(string $url): string
-    {
-        $stamp = null;
-
-        $this->get($url)->assertOk()->assertInertia(function (AssertableInertia $page) use (&$stamp) {
-            $stamp = $page->toArray()['props']['stamp'] ?? null;
-        });
-
-        return (string) $stamp;
-    }
-
-    protected function stampOf(string $url): string
-    {
-        parse_str((string) parse_url($url, PHP_URL_QUERY), $query);
-
-        return (string) ($query['stamp'] ?? '');
     }
 }

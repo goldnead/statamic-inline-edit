@@ -102,7 +102,7 @@ class ImageCellController extends FieldController
             ], fn ($v) => $v !== null), absolute: false),
             'csrfToken' => csrf_token(),
             'readOnly' => $request->user()->cant('update', $entry),
-            // Signed into the address with the rest: the entry as the page saw it.
+            // The entry as the page saw it, appended by the script on open.
             'stamp' => (string) $request->query('stamp', ''),
             'inplace' => false,
             'picker' => true,
@@ -246,7 +246,9 @@ class ImageCellController extends FieldController
 
         abort_unless($editor->enabled(), 404);
 
-        abort_unless(URL::hasValidSignature($request, absolute: false), 403);
+        // The page's stamp rides beside the signature, not inside it: it
+        // changes with every save the page makes, the signed address does not.
+        abort_unless(URL::hasValidSignature($request, absolute: false, ignoreQuery: ['stamp']), 403);
 
         abort_if($editor->imageContainers() === [], 404);
 

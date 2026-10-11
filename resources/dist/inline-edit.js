@@ -1103,7 +1103,7 @@
         inplaceFor = node;
         inplaceGeom = null;
         inplace.hidden = false;
-        inplaceFrame.src = node.dataset.sieFieldUrl;
+        inplaceFrame.src = withStamp(node.dataset.sieFieldUrl, node);
 
         window.addEventListener('resize', positionInplace);
 
@@ -1904,7 +1904,7 @@
         frame.title = panelTitle.textContent;
         frame.dataset.sieField = node.dataset.sieField || '';
         frame.dataset.sieSingle = single ? 'true' : '';
-        frame.src = url;
+        frame.src = single ? withStamp(url, node) : url;
 
         // Starts at a readable size and is corrected the moment the form
         // reports its own height, so the panel never flashes at full screen
@@ -1920,6 +1920,20 @@
         // form itself. Without this the keyboard is left behind on the page
         // underneath, which is the page this thing is covering.
         if (single) frame.focus(); else panelClose.focus();
+    }
+
+    /**
+     * The overlay's address plus the stamp this page holds for the entry right
+     * now. Read at click time, never baked into the address: the page's own
+     * saves refresh `data-sie-stamp`, and an address drawn before them would
+     * make the editor conflict with themselves.
+     */
+    function withStamp(url, node) {
+        var stamp = node.dataset.sieStamp;
+
+        if (!url || !stamp) return url;
+
+        return url + (url.indexOf('?') === -1 ? '?' : '&') + 'stamp=' + encodeURIComponent(stamp);
     }
 
     function closePanel() {

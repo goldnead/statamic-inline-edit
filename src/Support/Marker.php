@@ -347,7 +347,7 @@ class Marker
             $alt = null;
         }
 
-        $url = ImageCell::url($entry, Cell::address($grid, $row, $column), $label, $alt, $this->stamp($entry));
+        $url = ImageCell::url($entry, Cell::address($grid, $row, $column), $label, $alt);
 
         if ($url === null) {
             return [];
@@ -362,6 +362,9 @@ class Marker
             'data-sie-mode' => 'image',
             'data-sie-reload' => 'true',
             'data-sie-field-url' => $url,
+            // Kept outside the signed address on purpose: the script
+            // refreshes it after every save and appends it on open.
+            'data-sie-stamp' => $this->stamp($entry),
         ];
 
         $label ??= collect([Cell::grid($entry, $grid)?->display(), $field->display()])
@@ -596,14 +599,15 @@ class Marker
             return null;
         }
 
-        // The stamp of the page rather than of the moment the overlay opens:
-        // a card opened after somebody else saved must still be refused.
-        return route('statamic.cp.inline-edit.field.edit', array_filter([
+        // No stamp in here. The page keeps one (`data-sie-stamp`), refreshes
+        // it after each of its own saves, and the script appends it when the
+        // overlay opens; one baked into this address would go stale the
+        // moment the same page saved something else.
+        return route('statamic.cp.inline-edit.field.edit', [
             'collection' => $entry->collectionHandle(),
             'entry' => $entry->id(),
             'handle' => $handle,
-            'stamp' => $this->stamp($entry),
-        ], fn ($v) => $v !== ''));
+        ]);
     }
 
     /**

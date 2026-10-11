@@ -91,8 +91,7 @@ class ImageTest extends TestCase
         $this->assertSame('image', $marker['data-sie-mode']);
         $this->assertSame('hero', $marker['data-sie-field']);
         $this->assertSame('true', $marker['data-sie-reload']);
-        // Followed by the page's stamp, which the card sends back on save.
-        $this->assertStringContainsString('/cp/inline-edit/field/pages/entry-1/hero?stamp=', $marker['data-sie-field-url']);
+        $this->assertStringEndsWith('/cp/inline-edit/field/pages/entry-1/hero', $marker['data-sie-field-url']);
     }
 
     #[Test]
