@@ -5,6 +5,7 @@ namespace Goldnead\StatamicInlineEdit\Http\Controllers\Cp;
 use Goldnead\StatamicInlineEdit\Support\Cell;
 use Goldnead\StatamicInlineEdit\Support\Editor;
 use Goldnead\StatamicInlineEdit\Support\ImageCell;
+use Goldnead\StatamicInlineEdit\Support\Stamp;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\URL;
@@ -101,6 +102,8 @@ class ImageCellController extends FieldController
             ], fn ($v) => $v !== null), absolute: false),
             'csrfToken' => csrf_token(),
             'readOnly' => $request->user()->cant('update', $entry),
+            // Signed into the address with the rest: the entry as the page saw it.
+            'stamp' => (string) $request->query('stamp', ''),
             'inplace' => false,
             'picker' => true,
             'labels' => [
@@ -118,6 +121,10 @@ class ImageCellController extends FieldController
 
         [$grid, $index, $column] = $this->cell($request, $entry, $address);
         $altIndex = $this->altIndex($request, $entry, $grid, $address);
+
+        if ($conflict = $this->conflict($request, $entry)) {
+            return $conflict;
+        }
 
         // With an alt row the card sends two fields, and either may be the
         // only change. An empty picture then means "leave the picture": the
@@ -187,6 +194,8 @@ class ImageCellController extends FieldController
         foreach ($processed as $row => $value) {
             Cell::put($entry, $grid, $row, $column, $value);
         }
+
+        Stamp::touch($entry);
 
         $entry->save();
 

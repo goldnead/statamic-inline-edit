@@ -4,6 +4,7 @@ namespace Goldnead\StatamicInlineEdit\Http\Controllers;
 
 use Goldnead\StatamicInlineEdit\Support\Cell;
 use Goldnead\StatamicInlineEdit\Support\Editor;
+use Goldnead\StatamicInlineEdit\Support\Stamp;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
@@ -152,11 +153,16 @@ class SaveController extends Controller
             }
         }
 
+        // Moves the conflict stamp. Without it an entry that was ever saved in
+        // the control panel keeps its stored `updated_at`, and the stamp the
+        // next editor's page carries still matches.
+        Stamp::touch($entry);
+
         $entry->save();
 
         return [
             'id' => (string) $entry->id(),
-            'stamp' => $this->stamp($entry),
+            'stamp' => Stamp::of($entry),
         ];
     }
 
@@ -338,35 +344,15 @@ class SaveController extends Controller
     /**
      * Has anyone else written this entry since the page was rendered?
      *
-     * An empty stamp on either side means "cannot tell", and cannot-tell is
-     * treated as no conflict. Refusing a save because an entry could not
-     * report its own modification time would make the addon unusable on
-     * whichever storage driver happens not to track it.
+     * Cannot-tell counts as no conflict; see Stamp::isStale().
      */
     protected function conflict(EntryContract $entry, ?string $stamp): ?JsonResponse
     {
-        $current = $this->stamp($entry);
-
-        if (! $stamp || $current === '') {
-            return null;
-        }
-
-        if ($stamp === $current) {
+        if (! Stamp::isStale($entry, $stamp)) {
             return null;
         }
 
         return $this->error(__('statamic-inline-edit::messages.error_conflict'), 409);
-    }
-
-    protected function stamp(EntryContract $entry): string
-    {
-        if (! method_exists($entry, 'lastModified')) {
-            return '';
-        }
-
-        $modified = $entry->lastModified();
-
-        return $modified ? (string) $modified->getTimestamp() : '';
     }
 
     protected function error(string $message, int $status): JsonResponse

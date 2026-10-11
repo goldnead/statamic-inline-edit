@@ -21,6 +21,7 @@ const props = defineProps([
     'inplace',    // the frame stands where the content stood, not on a card
     'picker',     // a picture: open the asset browser straight away
     'labels',     // { save, saving, close, failed }
+    'stamp',      // the entry as the opening page saw it, echoed back on save
 ]);
 
 /**
@@ -117,10 +118,14 @@ async function save() {
                 'X-CSRF-TOKEN': props.csrfToken,
             },
             // Every field of the card: one, or a picture with its alt text.
-            body: JSON.stringify(Object.fromEntries(
-                (fields.value.length ? fields.value.map((field) => field.handle) : [props.handle])
-                    .map((handle) => [handle, values.value[handle] ?? null]),
-            )),
+            body: JSON.stringify({
+                ...Object.fromEntries(
+                    (fields.value.length ? fields.value.map((field) => field.handle) : [props.handle])
+                        .map((handle) => [handle, values.value[handle] ?? null]),
+                ),
+                // The server refuses the save if the entry moved on since.
+                ...(props.stamp ? { _stamp: props.stamp } : {}),
+            }),
         });
 
         const body = await response.json().catch(() => ({}));

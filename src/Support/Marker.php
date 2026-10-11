@@ -347,7 +347,7 @@ class Marker
             $alt = null;
         }
 
-        $url = ImageCell::url($entry, Cell::address($grid, $row, $column), $label, $alt);
+        $url = ImageCell::url($entry, Cell::address($grid, $row, $column), $label, $alt, $this->stamp($entry));
 
         if ($url === null) {
             return [];
@@ -596,11 +596,14 @@ class Marker
             return null;
         }
 
-        return route('statamic.cp.inline-edit.field.edit', [
+        // The stamp of the page rather than of the moment the overlay opens:
+        // a card opened after somebody else saved must still be refused.
+        return route('statamic.cp.inline-edit.field.edit', array_filter([
             'collection' => $entry->collectionHandle(),
             'entry' => $entry->id(),
             'handle' => $handle,
-        ]);
+            'stamp' => $this->stamp($entry),
+        ], fn ($v) => $v !== ''));
     }
 
     /**
@@ -682,13 +685,7 @@ class Marker
      */
     protected function stamp(mixed $entry): string
     {
-        if (! is_object($entry) || ! method_exists($entry, 'lastModified')) {
-            return '';
-        }
-
-        $modified = $entry->lastModified();
-
-        return $modified ? (string) $modified->getTimestamp() : '';
+        return Stamp::of($entry);
     }
 
     /**

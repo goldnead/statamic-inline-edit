@@ -4,6 +4,7 @@ namespace Goldnead\StatamicInlineEdit\Http\Controllers\Cp;
 
 use Goldnead\StatamicInlineEdit\Http\Controllers\SaveController;
 use Goldnead\StatamicInlineEdit\Support\Editor;
+use Goldnead\StatamicInlineEdit\Support\Stamp;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
@@ -61,6 +62,9 @@ class FieldController extends CpController
             // along as a prop rather than being dug back out of the cookie jar.
             'csrfToken' => csrf_token(),
             'readOnly' => $request->user()->cant('update', $entry),
+            // The entry as the page that opened this card saw it; sent back
+            // with the save so a card opened on an older page is refused.
+            'stamp' => (string) $request->query('stamp', ''),
             // Whether this frame stands where the content stood, rather than
             // on a card over it. It changes nothing about what is saved and
             // nothing about who may save it — only the chrome around the
@@ -84,6 +88,10 @@ class FieldController extends CpController
 
         [$fields] = $this->fieldsFor($entry, $handle, preProcess: false);
 
+        if ($conflict = $this->conflict($request, $entry)) {
+            return $conflict;
+        }
+
         $fields = $fields->addValues([$handle => $request->input($handle)]);
 
         try {
@@ -106,9 +114,26 @@ class FieldController extends CpController
         // left alone when the German one is edited.
         $entry->merge($fields->process()->values());
 
+        Stamp::touch($entry);
+
         $entry->save();
 
         return response()->json(['saved' => true]);
+    }
+
+    /**
+     * Has the entry been written since the page that opened this card was
+     * drawn? The same test, and the same 409, as the save on the page itself.
+     */
+    protected function conflict(Request $request, $entry): ?JsonResponse
+    {
+        $stamp = $request->input('_stamp');
+
+        if (! Stamp::isStale($entry, is_string($stamp) ? $stamp : null)) {
+            return null;
+        }
+
+        return response()->json(['message' => __('statamic-inline-edit::messages.error_conflict')], 409);
     }
 
     /**

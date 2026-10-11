@@ -98,7 +98,7 @@ jobs:
       # honest — if either does not match what the source produces, the job
       # fails rather than shipping a bundle nobody can reproduce.
       - name: Fail if a committed bundle is stale
-        run: git diff --exit-code -- resources/dist/inline-edit-rich.js public/build
+        run: git diff --exit-code -- resources/dist/inline-edit-rich.js resources/dist/THIRD-PARTY-NOTICES.txt public/build
 
   browser:
     runs-on: ubuntu-latest

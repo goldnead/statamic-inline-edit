@@ -30,7 +30,7 @@ class ImageCell
      * an afternoon, and the signature is a statement about the page, not a
      * session.
      */
-    public static function url(mixed $entry, string $address, ?string $label = null, ?string $alt = null): ?string
+    public static function url(mixed $entry, string $address, ?string $label = null, ?string $alt = null, ?string $stamp = null): ?string
     {
         if (! is_object($entry) || ! method_exists($entry, 'collectionHandle')) {
             return null;
@@ -51,6 +51,9 @@ class ImageCell
             // Signed like the rest: the card writes it only because the
             // server named it here.
             'alt' => $alt,
+            // The entry as the page saw it. Signed with the rest, so the card
+            // can tell the save what the page believed.
+            'stamp' => $stamp,
         ], fn ($v) => $v !== null && $v !== ''), absolute: false);
     }
 
