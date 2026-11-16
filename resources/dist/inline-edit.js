@@ -1916,6 +1916,9 @@
         panel.hidden = false;
         document.documentElement.classList.add('sie-panel-open');
 
+        // Only the one-field page reports in, so only it can be waited for.
+        if (single) watchFrame(); else stopWatching();
+
         // The card has no title bar to put focus on, so focus goes into the
         // form itself. Without this the keyboard is left behind on the page
         // underneath, which is the page this thing is covering.
@@ -1936,11 +1939,77 @@
         return url + (url.indexOf('?') === -1 ? '?' : '&') + 'stamp=' + encodeURIComponent(stamp);
     }
 
-    function closePanel() {
+    function hidePanel() {
+        stopWatching();
         panel.hidden = true;
         frame.removeAttribute('src');
         frame.dataset.sieSingle = '';
         document.documentElement.classList.remove('sie-panel-open');
+    }
+
+    /**
+     * The frame has three ways to end in an empty card, and none of them
+     * says so: a login redirect (the control panel's sign-in page refuses to
+     * be framed), a header that forbids framing, and a form that throws
+     * before it mounts. From out here they look the same, a card with
+     * nothing in it that seems about to do something.
+     *
+     * So the one-field page gets a few seconds to report in over
+     * `postMessage` (it does, as soon as it has a height), and a frame whose
+     * document cannot be reached at all is given up on at once: a framing ban
+     * turns `contentDocument` into null, which is the difference between
+     * "still loading" and "never going to load".
+     *
+     * Giving up closes the card without the reload that closePanel() does,
+     * because nothing happened to the entry, and says so in the bar, which is
+     * what is left uncovered.
+     */
+    var panelTimer = null;
+    var PANEL_TIMEOUT = config.panelTimeout > 0 ? config.panelTimeout : 8000;
+
+    function watchFrame(wait) {
+        stopWatching();
+        panelTimer = setTimeout(giveUpOnPanel, wait || PANEL_TIMEOUT);
+    }
+
+    function stopWatching() {
+        if (panelTimer) clearTimeout(panelTimer);
+        panelTimer = null;
+    }
+
+    function giveUpOnPanel() {
+        if (panel.hidden) return;
+
+        hidePanel();
+        panelFor = null;
+        status(L.panel_failed || 'The editor did not load. Open the page in the control panel instead.', 'bad');
+    }
+
+    frame.addEventListener('error', giveUpOnPanel);
+
+    frame.addEventListener('load', function () {
+        // Only the one-field page can be waited for; the full entry form
+        // never reports in, so there is nothing to time out on.
+        if (panel.hidden || !frame.getAttribute('src') || !frame.dataset.sieSingle) return;
+
+        var doc = null;
+
+        try {
+            doc = frame.contentDocument;
+        } catch (e) {
+            doc = null;
+        }
+
+        // A same-origin page we are allowed to frame always has a document.
+        // Null means a framing ban or a foreign page: it will never report
+        // in, so the long wait is cut short. Not to nothing: a page opened
+        // from a file, or behind an unusual proxy, can read as null and
+        // still talk, and one message cancels this.
+        if (!doc) watchFrame(Math.min(PANEL_TIMEOUT, 2000));
+    });
+
+    function closePanel() {
+        hidePanel();
 
         // Whatever happened in there happened to the entry, not to this page.
         // Reloading is the only honest way to show it, and it is also the only
@@ -2004,6 +2073,9 @@
         var data = event.data;
 
         if (!data || data.source !== 'statamic-inline-edit') return;
+
+        // It mounted and is talking: nothing left to wait for.
+        stopWatching();
 
         if (data.type === 'height' && frame.dataset.sieSingle) {
             // The asset browser is a stack over the whole document it lives

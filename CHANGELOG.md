@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- The one-field control-panel card no longer ends in an empty card when its frame never loads (a login redirect, a framing ban such as `X-Frame-Options: DENY`, a form that throws). If the frame does not report in over `postMessage` within 8 seconds (2 seconds when its document is unreachable), the card closes without reloading the page and the bar says what to do (`panel_failed`, English and German). A frame that reports in is left alone.
+
 ## 1.11.2
 
 ### Fixed
