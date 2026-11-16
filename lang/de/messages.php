@@ -17,7 +17,7 @@ return [
     'leave' => 'Auf dieser Seite sind Änderungen nicht gespeichert.',
     'leave_panel' => 'Auf dieser Seite sind Änderungen nicht gespeichert. Trotzdem ins Control Panel?',
     'panel_failed' => 'Der Editor hat nicht geladen. Im Control Panel anmelden oder das Einbetten erlauben (alternativ control_panel auf false setzen, dann öffnet die ganze Seite).',
-    'done' =>'Fertig',
+    'done' => 'Fertig',
     'close' => 'Schließen',
     'on' => 'An',
     'off' => 'Aus',
