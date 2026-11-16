@@ -16,6 +16,7 @@ return [
     'failed' => 'Could not save.',
     'leave' => 'You have unsaved changes on this page.',
     'leave_panel' => 'You have unsaved changes on this page. Open the control panel anyway?',
+    'panel_failed' => 'The editor did not load. Sign in to the control panel, or allow this site to frame it (set control_panel to false to open the full page instead).',
     'done' => 'Done',
     'close' => 'Close',
     'on' => 'On',

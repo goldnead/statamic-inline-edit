@@ -60,6 +60,7 @@ class Assets
                 'failed' => __('statamic-inline-edit::messages.failed'),
                 'leave' => __('statamic-inline-edit::messages.leave'),
                 'leave_panel' => __('statamic-inline-edit::messages.leave_panel'),
+                'panel_failed' => __('statamic-inline-edit::messages.panel_failed'),
                 'done' => __('statamic-inline-edit::messages.done'),
                 'close' => __('statamic-inline-edit::messages.close'),
                 'on' => __('statamic-inline-edit::messages.on'),

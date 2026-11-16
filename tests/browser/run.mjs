@@ -698,6 +698,42 @@ check('a field only the control panel can edit opens it over the page', await pa
 check('in an iframe pointed at the entry', (await frame.getAttribute('src')) === 'about:blank');
 check('with a way out', await page.locator('.sie-panel-close').isVisible());
 
+/* ------------------------------------------- a frame that never loads ---- */
+
+console.log('\nthe one-field panel when its frame never answers');
+
+// The fixture's picture opens the one-field card, and its frame is about:blank,
+// which never reports in. That is what a login redirect, a framing ban or a
+// broken bundle look like from out here: a card that stays empty. The fixture
+// sets the timeout to 1.5 s (`panelTimeout`), the shipped default is 8 s.
+await page.goto(PAGE);
+await page.waitForSelector('.sie-bar');
+if (await page.locator('.sie-launch').isVisible()) {
+    await page.locator('.sie-launch').click();
+}
+
+await page.evaluate(() => { window.__noReload = true; });
+await page.locator('[data-sie-field="tokens.b1.value"]').first().dblclick();
+check('the card opens', await page.locator('.sie-panel.sie-panel-card').isVisible());
+
+await page.waitForTimeout(2500);
+
+check('a frame that never answers closes the card', await page.locator('.sie-panel').evaluate((el) => el.hidden));
+check('and says what to do, in the bar', (await page.locator('.sie-status').textContent()).includes('did not load'));
+check('as an error', await page.locator('.sie-status').evaluate((el) => el.classList.contains('sie-bad')));
+check('without reloading the page', (await page.evaluate(() => window.__noReload)) === true);
+
+// A frame that does report in is left alone, however long it then stays open.
+await page.locator('[data-sie-field="tokens.b1.value"]').first().dblclick();
+await page.waitForTimeout(300);
+// From inside the frame itself, as the one-field page does; the fixture page
+// is a file, so reaching in from the parent is blocked.
+await page.frames().find((f) => f !== page.mainFrame()).evaluate(() => {
+    parent.postMessage({ source: 'statamic-inline-edit', type: 'height', height: 260 }, '*');
+});
+await page.waitForTimeout(2500);
+check('a frame that reported in stays open', await page.locator('.sie-panel').isVisible());
+
 /* --------------------------------------------------- the rich editor ---- */
 
 console.log('\nthe rich editor');
