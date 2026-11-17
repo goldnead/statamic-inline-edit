@@ -1520,6 +1520,19 @@ await page.keyboard.press('Enter');
 check('Enter in a one-line box closes the window', await page.locator('.sie-pop').isHidden());
 check('two windows changed', (await popCount.textContent()) === '2 unsaved', await popCount.textContent());
 
+// A window with several boxes and no label on the element used to be headed
+// with the first address ("hero_lines.a.text"), a key. The boxes have names;
+// the heading says them.
+await page.locator('h2[data-sie-mode="popup"]').dblclick();
+await page.waitForTimeout(100);
+check(
+    'a window with several boxes and no label is headed by the names of its boxes, not a key',
+    (await page.locator('.sie-pop .sie-pop-label').textContent()) === 'Zeile 1 · Zeile 2',
+    await page.locator('.sie-pop .sie-pop-label').textContent()
+);
+await page.keyboard.press('Escape');
+await page.waitForTimeout(50);
+
 reply = { status: 200, body: { saved: [{ id: 'entry-2', stamp: '1700010001' }] } };
 lastRequest = null;
 

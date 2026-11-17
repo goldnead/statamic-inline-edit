@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- A window with several boxes and no label on the element is headed by the
+  names of its boxes ("Line 1 · Line 2"), not by the first address
+  (`hero_lines.a.text`). Before, `InlineEdit::popup($entry, ['a.text' => 'Line 1',
+  'b.text' => 'Line 2'])` without the third argument showed a key as its title
+  even though every box in it had a name. A label on the element still wins.
+
 ## 1.11.3
 
 ### Fixed
