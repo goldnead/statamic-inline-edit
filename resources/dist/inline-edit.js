@@ -1649,6 +1649,20 @@
             'position:absolute !important;right:0 !important;bottom:0 !important;' +
             'margin:0 !important;padding:0 !important;gap:8px !important}',
 
+        // Bard's "Add Set" button, on an empty line.
+        //
+        // Core hangs it in the gutter, 18px to the left of the text, against
+        // the editor's box. The frame starts at the text, so the gutter is
+        // outside it: the button was cut in half and only a sliver of it could
+        // be clicked. Moved in rather than the frame widened, because the
+        // frame's left edge is the text's left edge and has to stay so. It
+        // only exists on an empty line, so over the text is empty space — the
+        // hint beside it ("Type '/' to insert a set") lands on the line it is
+        // about. Matched by structure (a button in a positioned direct child of
+        // the editor), not by core's utility classes.
+        '.sie-cp-inplace .bard-editor > .absolute:has(> button){' +
+            'inset-inline-start:0 !important}',
+
         // And if a field somehow still carries the docked toolbar — a
         // fieldtype that is not Bard, an older core — it at least stops being
         // a rule across the page.
