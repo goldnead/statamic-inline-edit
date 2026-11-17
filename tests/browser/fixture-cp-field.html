@@ -31,6 +31,15 @@
     .ProseMirror p { margin: 0 0 8px; }
     .bard-fixed-toolbar { background: #fff; border: 1px solid #d4d4d8; padding: 8px; }
     .sie-cp-actions { display: flex; gap: 8px; margin-top: 16px; }
+    /* Core's Bard draws its "Add Set" button in the gutter to the left of the
+       text, absolutely positioned against .bard-editor (Tailwind: `absolute
+       -start-4.5`, 18px out). The classes are the ones core's markup carries;
+       the rules are what they compile to. */
+    .bard-editor { position: relative; }
+    .absolute { position: absolute; }
+    .-start-4\.5 { inset-inline-start: -18px; }
+    .bard-gutter-set { display: flex; align-items: center; gap: 8px; top: 40px; z-index: 1; }
+    .bard-gutter-set button { width: 32px; height: 32px; border-radius: 50%; border: 1px solid #d4d4d8; background: #fff; }
 </style>
 </head>
 <body>
@@ -44,6 +53,13 @@
     <div class="bard-fieldtype">
         <div class="bard-editor">
             <div class="bard-fixed-toolbar">B  I  H2</div>
+
+            <!-- Where core puts it on an empty line: a direct child of the
+                 editor, button first, hint beside it. -->
+            <div class="absolute bard-gutter-set -start-4.5">
+                <button type="button" aria-label="Add Set">+</button>
+                <span>Type '/' to insert a set</span>
+            </div>
 
             <div class="field-box">
                 <div class="ProseMirror" contenteditable="true">

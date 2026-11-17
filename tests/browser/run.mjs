@@ -1189,6 +1189,31 @@ check(
     'h1 is ' + innerTop
 );
 
+// Core's "Add Set" button hangs in the gutter to the left of the text, and the
+// frame starts at the text. Left where core puts it the button is half outside
+// the frame: cut off, and only a sliver of it can be clicked. It has to move in
+// — and the text must not, because the text edge is what the frame is for.
+const setButton = await inner.locator('.bard-editor > .absolute > button').first().evaluate((el) => {
+    const box = el.getBoundingClientRect();
+    const hit = document.elementFromPoint(box.left + box.width / 2, box.top + box.height / 2);
+
+    return {
+        left: Math.round(box.left),
+        right: Math.round(box.right),
+        centreHit: hit === el || el.contains(hit),
+        textLeft: Math.round(document.querySelector('.ProseMirror').getBoundingClientRect().left),
+        frameWidth: window.innerWidth,
+    };
+});
+
+check(
+    'the Add Set button lies inside the frame, not half outside it',
+    setButton.left >= 0 && setButton.right <= setButton.frameWidth,
+    JSON.stringify(setButton)
+);
+check('and its middle is what a click there hits', setButton.centreHit, JSON.stringify(setButton));
+check('and the text keeps its edge', setButton.textLeft === 0, JSON.stringify(setButton));
+
 // The number the third Gauntlet round was sent back over: everything matched
 // and the line still broke one word earlier, because the control panel asks
 // the same variable font for a different optical size than the site does.
