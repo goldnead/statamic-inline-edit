@@ -657,7 +657,13 @@
 
         var head = document.createElement('span');
         head.className = 'sie-pop-label';
-        head.textContent = node.dataset.sieLabel || (fields.length === 1 ? fields[0].label : '') || node.dataset.sieField;
+        // The element's own label, else what the boxes are called. The key
+        // (an address like "hero_lines.a.text") is the last resort: a window
+        // with several boxes and no label used to be headed with it, while
+        // every box in it had a name.
+        head.textContent = node.dataset.sieLabel
+            || fields.map(function (f) { return f.label; }).filter(Boolean).join(' · ')
+            || node.dataset.sieField;
         pop.appendChild(head);
 
         var was = pending.has(node) ? pending.get(node) : {};
