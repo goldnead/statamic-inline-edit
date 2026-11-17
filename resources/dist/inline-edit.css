@@ -625,6 +625,9 @@
     text-transform: uppercase;
     color: #6b7280;
     white-space: nowrap;
+    /* A heading made of several box names can be longer than the window. */
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 /* `all: unset` above strips a select of its chevron and a date input of its
