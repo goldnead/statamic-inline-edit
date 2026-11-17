@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- Bard's "Add Set" button is no longer half outside the in-place frame. Core
+  hangs it in the gutter, 18px left of the text (28px in a narrow editor), and
+  the frame starts at the text, so on an empty line the button was cut in half
+  and only a sliver of it could be clicked. It now sits inside the frame, at the
+  text's left edge, over the empty line it belongs to (it only exists on an
+  empty line, so it covers no text); the frame and the text keep their edge.
+
 ## 1.11.3
 
 ### Fixed
