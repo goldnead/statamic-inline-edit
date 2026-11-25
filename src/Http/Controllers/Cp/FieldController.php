@@ -92,6 +92,12 @@ class FieldController extends CpController
             return $conflict;
         }
 
+        // No value at all is not "the editor emptied the field": a half-loaded
+        // frame or an old bundle sends none, and writing null would wipe it.
+        if (! $request->exists($handle)) {
+            return response()->json(['message' => __('statamic-inline-edit::messages.error_invalid')], 422);
+        }
+
         $fields = $fields->addValues([$handle => $request->input($handle)]);
 
         try {
@@ -116,7 +122,9 @@ class FieldController extends CpController
 
         Stamp::touch($entry);
 
-        $entry->save();
+        if ($entry->save() === false) {
+            return response()->json(['message' => __('statamic-inline-edit::messages.error_blocked')], 422);
+        }
 
         return response()->json(['saved' => true]);
     }

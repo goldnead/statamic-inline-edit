@@ -62,6 +62,10 @@ abstract class TestCase extends AddonTestCase
             'title' => ['type' => 'text', 'display' => 'Überschrift'],
             'intro' => ['type' => 'textarea'],
             'promoted' => ['type' => 'toggle'],
+            // Shown in the control panel, never writable from the page.
+            'berechnet' => ['type' => 'text', 'visibility' => 'read_only'],
+            'intern' => ['type' => 'text', 'visibility' => 'hidden'],
+            'errechnet' => ['type' => 'text', 'visibility' => 'computed'],
             // Not called `status`: an entry already has a computed `status`
             // of its own, and it wins in the cascade. A blueprint field with
             // that handle is simply never reachable from a template.

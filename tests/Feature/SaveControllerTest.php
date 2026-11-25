@@ -3,7 +3,10 @@
 namespace Goldnead\StatamicInlineEdit\Tests\Feature;
 
 use Goldnead\StatamicInlineEdit\Tests\TestCase;
+use Illuminate\Support\Facades\Event;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Test;
+use Statamic\Events\EntrySaving;
 use Statamic\Facades\Entry;
 
 class SaveControllerTest extends TestCase
@@ -216,5 +219,151 @@ class SaveControllerTest extends TestCase
             ->assertOk();
 
         $this->assertSame('Two words', Entry::find('entry-1')->get('title'));
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    protected function batch(array ...$changes): array
+    {
+        return ['changes' => $changes];
+    }
+
+    #[Test]
+    public function a_batch_with_one_missing_entry_saves_nothing(): void
+    {
+        $this->makeCollection();
+        $this->makeEntry(['title' => 'Old']);
+
+        // The page shows one mixture of saved and unsaved text if the first
+        // entry is written and the second refused. Nothing is written.
+        $this->actingAs($this->anEditor())
+            ->postJson($this->url, $this->batch(
+                ['id' => 'entry-1', 'fields' => ['title' => 'New']],
+                ['id' => 'gone', 'fields' => ['title' => 'Whatever']],
+            ))
+            ->assertNotFound();
+
+        $this->assertSame('Old', Entry::find('entry-1')->get('title'));
+    }
+
+    #[Test]
+    public function a_batch_with_one_invalid_field_saves_nothing(): void
+    {
+        $this->makeCollection();
+        $this->makeEntry(['title' => 'Old', 'belegung' => 'offen']);
+        $this->makeEntry(['title' => 'Two', 'belegung' => 'offen'], 'pages', 'entry-2');
+
+        $this->actingAs($this->anEditor())
+            ->postJson($this->url, $this->batch(
+                ['id' => 'entry-1', 'fields' => ['title' => 'New']],
+                ['id' => 'entry-2', 'fields' => ['belegung' => 'erfunden']],
+            ))
+            ->assertStatus(422);
+
+        $this->assertSame('Old', Entry::find('entry-1')->get('title'));
+        $this->assertSame('offen', Entry::find('entry-2')->get('belegung'));
+    }
+
+    #[Test]
+    public function a_batch_saves_every_entry_when_all_pass(): void
+    {
+        $this->makeCollection();
+        $this->makeEntry(['title' => 'One']);
+        $this->makeEntry(['title' => 'Two'], 'pages', 'entry-2');
+
+        $this->actingAs($this->anEditor())
+            ->postJson($this->url, $this->batch(
+                ['id' => 'entry-1', 'fields' => ['title' => 'First']],
+                ['id' => 'entry-2', 'fields' => ['title' => 'Second']],
+            ))
+            ->assertOk()
+            ->assertJsonCount(2, 'saved');
+
+        $this->assertSame('First', Entry::find('entry-1')->get('title'));
+        $this->assertSame('Second', Entry::find('entry-2')->get('title'));
+    }
+
+    #[Test]
+    public function the_same_entry_twice_in_one_batch_is_refused(): void
+    {
+        $this->makeCollection();
+        $this->makeEntry(['title' => 'Old']);
+
+        $this->actingAs($this->anEditor())
+            ->postJson($this->url, $this->batch(
+                ['id' => 'entry-1', 'fields' => ['title' => 'A']],
+                ['id' => 'entry-1', 'fields' => ['intro' => 'B']],
+            ))
+            ->assertStatus(422);
+
+        $this->assertSame('Old', Entry::find('entry-1')->get('title'));
+    }
+
+    #[Test]
+    public function a_save_blocked_by_a_site_listener_is_not_reported_as_saved(): void
+    {
+        $this->makeCollection();
+        $this->makeEntry(['title' => 'Old']);
+
+        // A site's own EntrySaving listener may veto the write. Core then
+        // returns false from save(); the page must not say "Saved".
+        Event::listen(EntrySaving::class, fn () => false);
+
+        $this->actingAs($this->anEditor())
+            ->postJson($this->url, $this->change(['title' => 'New']))
+            ->assertStatus(422)
+            ->assertJsonPath('message', __('statamic-inline-edit::messages.error_blocked'))
+            ->assertJsonMissingPath('saved');
+
+    }
+
+    #[Test]
+    public function a_veto_on_the_second_entry_names_the_entry_that_was_already_written(): void
+    {
+        $this->makeCollection();
+        $this->makeEntry(['title' => 'One']);
+        $this->makeEntry(['title' => 'Two'], 'pages', 'entry-2');
+
+        // The veto can only be seen at the write, so the first entry is
+        // already on disk; the answer must say so instead of leaving the page
+        // to guess.
+        Event::listen(EntrySaving::class, fn ($event) => $event->entry->id() === 'entry-2' ? false : null);
+
+        $this->actingAs($this->anEditor())
+            ->postJson($this->url, $this->batch(
+                ['id' => 'entry-1', 'fields' => ['title' => 'First']],
+                ['id' => 'entry-2', 'fields' => ['title' => 'Second']],
+            ))
+            ->assertStatus(422)
+            ->assertJsonPath('saved.0.id', 'entry-1')
+            ->assertJsonCount(1, 'saved');
+    }
+
+    #[Test]
+    #[DataProvider('lockedFields')]
+    public function a_locked_field_is_refused_even_when_posted_directly(string $handle): void
+    {
+        $this->makeCollection();
+        $this->makeEntry(['title' => 'Old', $handle => 'set by the site']);
+
+        // The marker never offers it; the request must not be a way around that.
+        $this->actingAs($this->anEditor())
+            ->postJson($this->url, $this->change([$handle => 'overwritten']))
+            ->assertStatus(422);
+
+        $this->assertSame('set by the site', Entry::find('entry-1')->get($handle));
+    }
+
+    /**
+     * @return array<string, array{string}>
+     */
+    public static function lockedFields(): array
+    {
+        return [
+            'read_only' => ['berechnet'],
+            'hidden' => ['intern'],
+            'computed' => ['errechnet'],
+        ];
     }
 }
