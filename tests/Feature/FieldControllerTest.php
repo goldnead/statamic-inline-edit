@@ -4,8 +4,10 @@ namespace Goldnead\StatamicInlineEdit\Tests\Feature;
 
 use Goldnead\StatamicInlineEdit\Http\Controllers\Cp\FieldController;
 use Goldnead\StatamicInlineEdit\Tests\TestCase;
+use Illuminate\Support\Facades\Event;
 use Inertia\Testing\AssertableInertia;
 use PHPUnit\Framework\Attributes\Test;
+use Statamic\Events\EntrySaving;
 use Statamic\Facades\Blueprint;
 use Statamic\Facades\Entry;
 
@@ -209,5 +211,47 @@ class FieldControllerTest extends TestCase
         $this->actingAs($this->anEditor())
             ->get($this->url('inhalt'))
             ->assertNotFound();
+    }
+
+    #[Test]
+    public function a_request_without_the_value_does_not_clear_the_field(): void
+    {
+        $this->makeCollection();
+        $this->makeEntry(['title' => 'Hello', 'intro' => 'An intro']);
+
+        // A half-loaded frame or an old bundle sends no value at all. That is
+        // not "the editor emptied the field".
+        $this->actingAs($this->anEditor())
+            ->patchJson($this->url('intro'), [])
+            ->assertStatus(422);
+
+        $this->assertSame('An intro', Entry::find('entry-1')->get('intro'));
+    }
+
+    #[Test]
+    public function an_explicit_empty_value_still_clears_the_field(): void
+    {
+        $this->makeCollection();
+        $this->makeEntry(['title' => 'Hello', 'intro' => 'An intro']);
+
+        $this->actingAs($this->anEditor())
+            ->patchJson($this->url('intro'), ['intro' => null])
+            ->assertOk();
+
+        $this->assertEmpty(Entry::find('entry-1')->get('intro'));
+    }
+
+    #[Test]
+    public function a_save_blocked_by_a_site_listener_is_not_reported_as_saved(): void
+    {
+        $this->makeCollection();
+        $this->makeEntry(['title' => 'Hello', 'intro' => 'An intro']);
+
+        Event::listen(EntrySaving::class, fn () => false);
+
+        $this->actingAs($this->anEditor())
+            ->patchJson($this->url('intro'), ['intro' => 'Changed'])
+            ->assertStatus(422)
+            ->assertJsonMissing(['saved' => true]);
     }
 }

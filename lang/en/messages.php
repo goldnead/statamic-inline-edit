@@ -48,5 +48,6 @@ return [
     'error_invalid' => 'That did not pass validation.',
     'error_image' => 'Please choose one picture from the asset browser.',
     'error_conflict' => 'Someone else changed this entry after the page was loaded.',
+    'error_blocked' => 'The site refused to save this entry.',
 
 ];

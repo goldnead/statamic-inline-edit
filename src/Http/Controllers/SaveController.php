@@ -53,15 +53,31 @@ class SaveController extends Controller
 
         $data = $request->validate([
             'changes' => ['required', 'array', 'min:1', 'max:50'],
-            'changes.*.id' => ['required', 'string', 'max:255'],
+            'changes.*.id' => ['required', 'string', 'max:255', 'distinct'],
             'changes.*.stamp' => ['nullable', 'string', 'max:32'],
             'changes.*.fields' => ['required', 'array', 'min:1', 'max:50'],
         ]);
 
-        $saved = [];
+        // Two passes. The first checks and validates every entry and writes
+        // nothing; the second writes. A batch that fails a check is refused
+        // whole, so the page never ends up showing a mixture of saved and
+        // unsaved text with no way to tell which is which.
+        $prepared = [];
 
         foreach ($data['changes'] as $change) {
-            $result = $this->applyChange($editor, $change);
+            $result = $this->prepareChange($editor, $change);
+
+            if ($result instanceof JsonResponse) {
+                return $result;
+            }
+
+            $prepared[] = $result;
+        }
+
+        $saved = [];
+
+        foreach ($prepared as $change) {
+            $result = $this->commitChange($change);
 
             if ($result instanceof JsonResponse) {
                 return $result;
@@ -74,16 +90,13 @@ class SaveController extends Controller
     }
 
     /**
-     * One entry. Returns its new stamp, or the response that stops the lot.
-     *
-     * Stops the lot, rather than saving what it can and reporting the rest:
-     * a half-applied batch leaves the page showing a mixture of saved and
-     * unsaved text with no way to tell which is which.
+     * One entry, checked and validated, nothing written yet. Returns what the
+     * write needs, or the response that stops the lot.
      *
      * @param  array<string, mixed>  $change
-     * @return array<string, string>|JsonResponse
+     * @return array{entry: EntryContract, processed: array<string, mixed>, cells: array<string, array<int, array<string, mixed>>>}|JsonResponse
      */
-    protected function applyChange(Editor $editor, array $change): array|JsonResponse
+    protected function prepareChange(Editor $editor, array $change): array|JsonResponse
     {
         $entry = Entry::find($change['id']);
 
@@ -138,6 +151,20 @@ class SaveController extends Controller
             $processed = $fields->process()->values()->all();
         }
 
+        return ['entry' => $entry, 'processed' => $processed, 'cells' => $cells];
+    }
+
+    /**
+     * Writes one prepared entry. Returns its new stamp, or the response that
+     * says the write did not happen.
+     *
+     * @param  array{entry: EntryContract, processed: array<string, mixed>, cells: array<string, array<int, array<string, mixed>>>}  $change
+     * @return array<string, string>|JsonResponse
+     */
+    protected function commitChange(array $change): array|JsonResponse
+    {
+        ['entry' => $entry, 'processed' => $processed, 'cells' => $cells] = $change;
+
         // On a localized entry this writes into that localization, which means
         // the field stops inheriting from its origin — exactly what the control
         // panel does once you localize a field there. Editing the German page
@@ -158,7 +185,11 @@ class SaveController extends Controller
         // next editor's page carries still matches.
         Stamp::touch($entry);
 
-        $entry->save();
+        // A site's EntrySaving listener may veto the write, and core then
+        // returns false. Saying "saved" over that is the silent kind of lie.
+        if ($entry->save() === false) {
+            return $this->error(__('statamic-inline-edit::messages.error_blocked'), 422);
+        }
 
         return [
             'id' => (string) $entry->id(),
@@ -192,6 +223,12 @@ class SaveController extends Controller
             $field = $blueprint->hasField($handle) ? $blueprint->field($handle) : null;
 
             if (! $field || ! $editor->isWritableMode($editor->modeFor($field->type()))) {
+                return $this->error(__('statamic-inline-edit::messages.error_field', ['field' => $handle]), 422);
+            }
+
+            // The marker never offers a field the control panel locks; a
+            // request that names one anyway is not made welcome here either.
+            if (in_array($field->visibility(), ['read_only', 'hidden', 'computed'], true)) {
                 return $this->error(__('statamic-inline-edit::messages.error_field', ['field' => $handle]), 422);
             }
 

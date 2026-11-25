@@ -48,5 +48,6 @@ return [
     'error_invalid' => 'Das hat die Prüfung nicht bestanden.',
     'error_image' => 'Bitte genau ein Bild aus dem Asset-Browser wählen.',
     'error_conflict' => 'Jemand anders hat den Eintrag geändert, nachdem die Seite geladen wurde.',
+    'error_blocked' => 'Die Seite hat das Speichern dieses Eintrags abgelehnt.',
 
 ];
