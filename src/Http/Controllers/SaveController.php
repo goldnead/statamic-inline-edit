@@ -80,6 +80,13 @@ class SaveController extends Controller
             $result = $this->commitChange($change);
 
             if ($result instanceof JsonResponse) {
+                // Only a site's veto can still land here, and it cannot be
+                // seen before the write. What was already written is named,
+                // so a client is able to say which entries are saved.
+                if ($saved !== []) {
+                    $result->setData(array_merge((array) $result->getData(true), ['saved' => $saved]));
+                }
+
                 return $result;
             }
 

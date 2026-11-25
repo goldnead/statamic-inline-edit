@@ -4,6 +4,7 @@ namespace Goldnead\StatamicInlineEdit\Tests\Feature;
 
 use Goldnead\StatamicInlineEdit\Tests\TestCase;
 use Illuminate\Support\Facades\Event;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Test;
 use Statamic\Events\EntrySaving;
 use Statamic\Facades\Entry;
@@ -312,20 +313,57 @@ class SaveControllerTest extends TestCase
         $this->actingAs($this->anEditor())
             ->postJson($this->url, $this->change(['title' => 'New']))
             ->assertStatus(422)
-            ->assertJsonMissing(['saved']);
+            ->assertJsonPath('message', __('statamic-inline-edit::messages.error_blocked'))
+            ->assertJsonMissingPath('saved');
+
     }
 
     #[Test]
-    public function a_read_only_field_is_refused_even_when_posted_directly(): void
+    public function a_veto_on_the_second_entry_names_the_entry_that_was_already_written(): void
     {
         $this->makeCollection();
-        $this->makeEntry(['title' => 'Old', 'berechnet' => 'computed by the site']);
+        $this->makeEntry(['title' => 'One']);
+        $this->makeEntry(['title' => 'Two'], 'pages', 'entry-2');
+
+        // The veto can only be seen at the write, so the first entry is
+        // already on disk; the answer must say so instead of leaving the page
+        // to guess.
+        Event::listen(EntrySaving::class, fn ($event) => $event->entry->id() === 'entry-2' ? false : null);
+
+        $this->actingAs($this->anEditor())
+            ->postJson($this->url, $this->batch(
+                ['id' => 'entry-1', 'fields' => ['title' => 'First']],
+                ['id' => 'entry-2', 'fields' => ['title' => 'Second']],
+            ))
+            ->assertStatus(422)
+            ->assertJsonPath('saved.0.id', 'entry-1')
+            ->assertJsonCount(1, 'saved');
+    }
+
+    #[Test]
+    #[DataProvider('lockedFields')]
+    public function a_locked_field_is_refused_even_when_posted_directly(string $handle): void
+    {
+        $this->makeCollection();
+        $this->makeEntry(['title' => 'Old', $handle => 'set by the site']);
 
         // The marker never offers it; the request must not be a way around that.
         $this->actingAs($this->anEditor())
-            ->postJson($this->url, $this->change(['berechnet' => 'overwritten']))
+            ->postJson($this->url, $this->change([$handle => 'overwritten']))
             ->assertStatus(422);
 
-        $this->assertSame('computed by the site', Entry::find('entry-1')->get('berechnet'));
+        $this->assertSame('set by the site', Entry::find('entry-1')->get($handle));
+    }
+
+    /**
+     * @return array<string, array{string}>
+     */
+    public static function lockedFields(): array
+    {
+        return [
+            'read_only' => ['berechnet'],
+            'hidden' => ['intern'],
+            'computed' => ['errechnet'],
+        ];
     }
 }

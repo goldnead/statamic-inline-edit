@@ -5,7 +5,7 @@
 ### Fixed
 
 - A batch save is checked as a whole before anything is written. Before, a refused second entry (missing, forbidden, conflict, validation) left the first one already saved while the page showed everything as unsaved; the next save then answered 409 against its own write. The same entry twice in one batch is refused (422).
-- A save that a site's `EntrySaving` listener vetoes is answered with 422 (`error_blocked`) instead of "saved", on the page and in the control panel card.
+- A save that a site's `EntrySaving` listener vetoes is answered with 422 (`error_blocked`) instead of "saved", on the page and in the control panel card. A veto can only be seen at the write: when it hits a later entry of a batch, the answer lists the entries already written under `saved`.
 - Fields the control panel locks (`read_only`, `hidden`, `computed`) are refused on the save route too, as the markers already did.
 - The control panel card refuses a request that carries no value (422) instead of writing `null` over the field.
 
